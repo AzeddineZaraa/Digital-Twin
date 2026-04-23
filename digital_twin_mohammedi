@@ -1,0 +1,482 @@
+# ════════════════════════════════════════════════════════════════════
+# DIGITAL TWIN PV — Cell Amrecan OS-P72-330W
+# Site : Mohammedia, Maroc
+# Coordonnées : 33.6861° N, -7.3833° W — Altitude : 15 m
+# Dernière mise à jour : 2025
+# ════════════════════════════════════════════════════════════════════
+
+import subprocess, sys
+
+def install(pkg):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "-q"])
+
+try:
+    import pvlib
+except ImportError:
+    install("pvlib")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.gridspec as gridspec
+import requests
+import pvlib
+from pvlib import location, irradiance, atmosphere, temperature
+from pvlib.location import Location
+import warnings
+warnings.filterwarnings('ignore')
+import os
+
+os.makedirs('digital_twin_mohammedia', exist_ok=True)
+print("✓ Librairies chargées")
+
+# ════════════════════════════════════════════════════════════════════
+# 1. PARAMÈTRES DU SITE — MOHAMMEDIA
+# ════════════════════════════════════════════════════════════════════
+LAT       = 33.6861
+LON       = -7.3833
+ALTITUDE  = 15          # m (ville côtière sur l'Atlantique)
+TIMEZONE  = 'Africa/Casablanca'
+SITE_NAME = 'Mohammedia, Maroc'
+
+# Panneau : Cell Amrecan OS-P72-330W (inchangé)
+TILT          = 31       # inclinaison (°) — optimale pour latitude ~33°
+AZIMUTH       = 180      # plein sud
+SURFACE       = 1.939    # m² par panneau
+EFF_STC       = 0.170    # rendement à STC (17 %)
+NB_PANELS     = 12
+GAMMA_PMAX    = -0.0040  # coeff thermique (%/°C)
+T_STC         = 25.0
+EFF_SYSTEME   = 0.65     # rendement BOS + onduleur
+
+Pnom = NB_PANELS * SURFACE * EFF_STC * 1000   # Puissance nominale (W)
+
+print(f"✓ Site         : {SITE_NAME}")
+print(f"  Latitude     : {LAT}° N")
+print(f"  Longitude    : {LON}° E")
+print(f"  Altitude     : {ALTITUDE} m")
+print(f"  Pnom         : {Pnom:.0f} W  ({NB_PANELS} panneaux × 330 W)")
+
+# ════════════════════════════════════════════════════════════════════
+# 2. LECTURE OPTIONNELLE DU FICHIER CSV LOCAL
+#    (si absent → on utilise uniquement Open-Meteo)
+# ════════════════════════════════════════════════════════════════════
+CSV_PATH = 'fichier.csv'      # ← modifiez ce chemin si nécessaire
+BIAIS_CORRECTION = 48.0
+
+df_local = None
+if os.path.exists(CSV_PATH):
+    try:
+        df_raw = pd.read_csv(
+            CSV_PATH, sep=';', skiprows=2,
+            header=None, na_values=['---']
+        )
+        df_local = df_raw[[0, 1, 2, 5, 7, 19]].copy()
+        df_local.columns = ['Date', 'Heure', 'Temp', 'Hum', 'Vent', 'GHI']
+        df_local['Datetime'] = pd.to_datetime(
+            df_local['Date'] + ' ' + df_local['Heure'],
+            format='%d/%m/%Y %H:%M'
+        )
+        for c in ['Temp', 'Hum', 'Vent', 'GHI']:
+            df_local[c] = pd.to_numeric(df_local[c], errors='coerce')
+        df_local['GHI'] = (df_local['GHI'] + BIAIS_CORRECTION).clip(lower=0)
+        df_local = df_local.sort_values('Datetime').set_index('Datetime')
+        print(f"\n✓ CSV local chargé et corrigé (+{BIAIS_CORRECTION} W/m²)")
+    except Exception as e:
+        print(f"⚠ CSV ignoré ({e}) — Open-Meteo seul utilisé")
+        df_local = None
+else:
+    print(f"\n⚠ Fichier '{CSV_PATH}' introuvable — Open-Meteo seul utilisé")
+
+# ════════════════════════════════════════════════════════════════════
+# 3. TÉLÉCHARGEMENT OPEN-METEO (Mohammedia)
+# ════════════════════════════════════════════════════════════════════
+DATE_START = "2024-01-01"
+DATE_END   = "2024-12-31"
+
+print(f"\nTéléchargement Open-Meteo ({DATE_START} → {DATE_END})…")
+url = "https://archive-api.open-meteo.com/v1/archive"
+params = {
+    "latitude":   LAT,
+    "longitude":  LON,
+    "start_date": DATE_START,
+    "end_date":   DATE_END,
+    "hourly": (
+        "shortwave_radiation,direct_normal_irradiance,"
+        "diffuse_radiation,temperature_2m,windspeed_10m"
+    ),
+    "timezone": TIMEZONE
+}
+resp = requests.get(url, params=params, timeout=60)
+resp.raise_for_status()
+data = resp.json()
+
+df_web = pd.DataFrame({
+    'GHI_web':  data['hourly']['shortwave_radiation'],
+    'DNI_web':  data['hourly']['direct_normal_irradiance'],
+    'DHI_web':  data['hourly']['diffuse_radiation'],
+    'Temp_web': data['hourly']['temperature_2m'],
+    'Vent_web': data['hourly']['windspeed_10m'],
+}, index=pd.to_datetime(data['hourly']['time']))
+df_web.index.name = 'Datetime'
+# Supprimer timezone pour cohérence avec les données locales
+df_web.index = df_web.index.tz_localize(None)
+
+print(f"✓ Open-Meteo : {len(df_web)} heures téléchargées")
+
+# ════════════════════════════════════════════════════════════════════
+# 4. FUSION — LOCAL PRIORITAIRE, OPEN-METEO POUR LES LACUNES
+# ════════════════════════════════════════════════════════════════════
+idx_complet = pd.date_range(DATE_START, f"{DATE_END} 23:00", freq='1h')
+df_final = pd.DataFrame(index=idx_complet)
+df_final.index.name = 'Datetime'
+
+if df_local is not None:
+    df_h = df_local[['Temp', 'Hum', 'Vent', 'GHI']].resample('1h').mean()
+    df_final['GHI']  = df_h['GHI'].reindex(df_final.index).fillna(df_web['GHI_web'])
+    df_final['Temp'] = df_h['Temp'].reindex(df_final.index).fillna(df_web['Temp_web'])
+    df_final['Vent'] = df_h['Vent'].reindex(df_final.index).fillna(df_web['Vent_web'])
+    df_final['source'] = np.where(
+        df_h['GHI'].reindex(df_final.index).notna(), 'Station', 'Open-Meteo'
+    )
+else:
+    df_final['GHI']    = df_web['GHI_web'].reindex(df_final.index)
+    df_final['Temp']   = df_web['Temp_web'].reindex(df_final.index)
+    df_final['Vent']   = df_web['Vent_web'].reindex(df_final.index)
+    df_final['source'] = 'Open-Meteo'
+
+df_final['DNI'] = df_web['DNI_web'].reindex(df_final.index)
+df_final['DHI'] = df_web['DHI_web'].reindex(df_final.index)
+df_final = df_final.dropna(subset=['GHI', 'DNI', 'DHI'])
+
+print(f"\n✓ Série fusionnée : {len(df_final)} heures")
+print(f"  Station locale  : {(df_final['source']=='Station').sum()} h")
+print(f"  Open-Meteo      : {(df_final['source']=='Open-Meteo').sum()} h")
+
+# ════════════════════════════════════════════════════════════════════
+# 5. POSITION SOLAIRE ET RAYONNEMENT POA (Mohammedia)
+# ════════════════════════════════════════════════════════════════════
+site = Location(
+    latitude=LAT,
+    longitude=LON,
+    tz=TIMEZONE,
+    altitude=ALTITUDE,
+    name=SITE_NAME
+)
+
+# Ajouter timezone pour pvlib
+idx_tz = df_final.index.tz_localize(TIMEZONE, ambiguous='infer', nonexistent='shift_forward')
+
+solar_pos = site.get_solarposition(idx_tz)
+solar_pos.index = df_final.index   # Retirer tz pour l'alignement
+
+dni_extra = irradiance.get_extra_radiation(df_final.index)
+
+poa = irradiance.get_total_irradiance(
+    surface_tilt=TILT,
+    surface_azimuth=AZIMUTH,
+    solar_zenith=solar_pos['apparent_zenith'],
+    solar_azimuth=solar_pos['azimuth'],
+    dni=df_final['DNI'],
+    ghi=df_final['GHI'],
+    dhi=df_final['DHI'],
+    dni_extra=dni_extra,
+    model='perez'
+)
+df_final['POA'] = poa['poa_global'].clip(lower=0)
+print(f"\n✓ Rayonnement POA calculé (modèle Perez, tilt={TILT}°, azimuth={AZIMUTH}°)")
+
+# ════════════════════════════════════════════════════════════════════
+# 6. TEMPÉRATURE DU MODULE (modèle Faiman)
+# ════════════════════════════════════════════════════════════════════
+df_final['T_module'] = temperature.faiman(
+    poa_global=df_final['POA'],
+    temp_air=df_final['Temp'],
+    wind_speed=df_final['Vent']
+)
+print("✓ Température module calculée (modèle Faiman)")
+
+# ════════════════════════════════════════════════════════════════════
+# 7. MODÈLE PV — PUISSANCE DC / AC
+# ════════════════════════════════════════════════════════════════════
+df_final['P_DC'] = (
+    df_final['POA'] / 1000
+    * Pnom
+    * (1 + GAMMA_PMAX * (df_final['T_module'] - T_STC))
+).clip(lower=0)
+
+df_final['P_AC'] = (df_final['P_DC'] * EFF_SYSTEME).clip(lower=0)
+
+df_final['Pertes_thermiques_pct'] = (
+    GAMMA_PMAX * (df_final['T_module'] - T_STC) * 100
+).clip(upper=0)
+
+# ════════════════════════════════════════════════════════════════════
+# 8. ÉNERGIE JOURNALIÈRE ET INDICATEURS DE PERFORMANCE
+# ════════════════════════════════════════════════════════════════════
+daily = df_final.resample('1D').agg(
+    E_kWh         =('P_AC',                  lambda x: x.sum() / 1000),
+    GHI_moy       =('GHI',                   'mean'),
+    POA_moy       =('POA',                   'mean'),
+    T_moy         =('Temp',                  'mean'),
+    T_mod_moy     =('T_module',              'mean'),
+    T_mod_max     =('T_module',              'max'),
+    P_max         =('P_AC',                  'max'),
+    Pertes_th_moy =('Pertes_thermiques_pct', 'mean'),
+    source        =('source',                'first')
+).dropna(subset=['E_kWh'])
+
+daily['E_theorique'] = (daily['POA_moy'] * 24 / 1000) * (Pnom / 1000)
+daily['PR']  = (daily['E_kWh'] / daily['E_theorique'].replace(0, np.nan)).clip(0, 1)
+daily['Ys']  = daily['E_kWh'] / (Pnom / 1000)   # heures équivalentes
+
+# Agrégation mensuelle
+monthly = daily.resample('ME').agg(
+    E_kWh    =('E_kWh',  'sum'),
+    PR_moy   =('PR',     'mean'),
+    T_moy    =('T_moy',  'mean'),
+    T_mod_moy=('T_mod_moy','mean'),
+    Ys_moy   =('Ys',     'mean'),
+)
+monthly.index = monthly.index.strftime('%b %Y')
+
+print(f"\n✓ Énergie et PR calculés")
+print(f"  Énergie totale annuelle : {daily['E_kWh'].sum():.1f} kWh")
+print(f"  PR moyen                : {daily['PR'].mean()*100:.1f} %")
+print(f"  Ys moyen                : {daily['Ys'].mean():.2f} h/j")
+
+# ════════════════════════════════════════════════════════════════════
+# 9. DÉTECTION D'ANOMALIES (±2σ sur le PR)
+# ════════════════════════════════════════════════════════════════════
+pr_moy = daily['PR'].mean()
+pr_std = daily['PR'].std()
+SEUIL_BAS  = pr_moy - 2 * pr_std
+SEUIL_HAUT = pr_moy + 2 * pr_std
+
+daily['anomalie'] = (
+    ((daily['PR'] < SEUIL_BAS) | (daily['PR'] > SEUIL_HAUT))
+    & (daily['POA_moy'] > 50)
+)
+n_anomalies = int(daily['anomalie'].sum())
+print(f"\n✓ Anomalies détectées : {n_anomalies} jours")
+print(f"  Seuil bas  : PR < {SEUIL_BAS*100:.1f} %")
+print(f"  Seuil haut : PR > {SEUIL_HAUT*100:.1f} %")
+
+# ════════════════════════════════════════════════════════════════════
+# 10. VISUALISATIONS
+# ════════════════════════════════════════════════════════════════════
+DARK_BG  = '#0d1117'
+PANEL_BG = '#161b22'
+BORDER   = '#2a3547'
+GREEN    = '#1D9E75'
+BLUE     = '#3b82f6'
+AMBER    = '#f59e0b'
+RED      = '#ef4444'
+MUTED    = '#8fa3bf'
+TEXT     = '#e8edf5'
+
+plt.rcParams.update({
+    'figure.facecolor': DARK_BG,
+    'axes.facecolor':   PANEL_BG,
+    'axes.edgecolor':   BORDER,
+    'axes.labelcolor':  MUTED,
+    'xtick.color':      MUTED,
+    'ytick.color':      MUTED,
+    'text.color':       TEXT,
+    'grid.color':       BORDER,
+    'grid.linewidth':   0.5,
+    'font.family':      'DejaVu Sans',
+    'font.size':        10,
+})
+
+# ── FIG 1 : Production journalière + anomalies ─────────────────
+fig1, axes = plt.subplots(3, 1, figsize=(14, 11), facecolor=DARK_BG)
+fig1.suptitle(f'Digital Twin PV — {SITE_NAME}  |  {DATE_START[:4]}',
+              fontsize=14, fontweight='bold', color=TEXT, y=0.98)
+
+# Subplot 1 — Énergie journalière
+ax = axes[0]
+ax.bar(daily.index, daily['E_kWh'], color=GREEN, alpha=0.8, width=0.8, label='Énergie AC (kWh)')
+anom = daily[daily['anomalie']]
+ax.scatter(anom.index, anom['E_kWh'], color=RED, zorder=5, s=35, label=f'Anomalie ({len(anom)} j)', marker='x')
+ax.axhline(daily['E_kWh'].mean(), color=AMBER, ls='--', lw=1.2, label=f"Moy. {daily['E_kWh'].mean():.2f} kWh/j")
+ax.set_ylabel('Énergie (kWh)', color=MUTED)
+ax.set_title('Production journalière', color=TEXT, fontsize=11, pad=6)
+ax.legend(fontsize=9, facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax.grid(axis='y')
+ax.set_xlim(daily.index[0], daily.index[-1])
+
+# Subplot 2 — Performance Ratio
+ax2 = axes[1]
+pr_pct = daily['PR'] * 100
+ax2.plot(daily.index, pr_pct, color=BLUE, lw=1.2, alpha=0.9, label='PR (%)')
+ax2.fill_between(daily.index, pr_pct, alpha=0.15, color=BLUE)
+ax2.axhline(pr_pct.mean(), color=AMBER, ls='--', lw=1.2, label=f"Moy. {pr_pct.mean():.1f} %")
+ax2.axhline(SEUIL_BAS * 100, color=RED, ls=':', lw=1, alpha=0.7, label=f"Seuil −2σ ({SEUIL_BAS*100:.1f} %)")
+ax2.scatter(anom.index, anom['PR']*100, color=RED, zorder=5, s=35, marker='x')
+ax2.set_ylabel('PR (%)', color=MUTED)
+ax2.set_title('Performance Ratio journalier', color=TEXT, fontsize=11, pad=6)
+ax2.legend(fontsize=9, facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax2.grid(axis='y')
+ax2.set_xlim(daily.index[0], daily.index[-1])
+
+# Subplot 3 — Température module vs air
+ax3 = axes[2]
+ax3.plot(daily.index, daily['T_moy'],     color=MUTED,  lw=1.0, alpha=0.8, label='Temp. air (°C)')
+ax3.plot(daily.index, daily['T_mod_moy'], color=RED,    lw=1.2, alpha=0.9, label='Temp. module moy. (°C)')
+ax3.plot(daily.index, daily['T_mod_max'], color=AMBER,  lw=0.8, ls='--', alpha=0.7, label='Temp. module max (°C)')
+ax3.set_ylabel('Température (°C)', color=MUTED)
+ax3.set_title('Températures air / module', color=TEXT, fontsize=11, pad=6)
+ax3.legend(fontsize=9, facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax3.grid(axis='y')
+ax3.set_xlim(daily.index[0], daily.index[-1])
+
+for a in axes:
+    a.tick_params(colors=MUTED)
+    for spine in a.spines.values():
+        spine.set_edgecolor(BORDER)
+
+plt.tight_layout(rect=[0, 0, 1, 0.97])
+fig1.savefig('digital_twin_mohammedia/fig1_production_journaliere.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("\n✓ Figure 1 sauvegardée")
+
+# ── FIG 2 : Mensuel + Irradiance + Heatmap ─────────────────────
+fig2, axes2 = plt.subplots(1, 3, figsize=(16, 5), facecolor=DARK_BG)
+fig2.suptitle(f'Analyse mensuelle — {SITE_NAME}', fontsize=13,
+              fontweight='bold', color=TEXT, y=1.01)
+
+# Subplot 1 — Énergie mensuelle
+ax = axes2[0]
+bars = ax.bar(range(len(monthly)), monthly['E_kWh'],
+              color=[GREEN if v >= monthly['E_kWh'].mean() else BLUE for v in monthly['E_kWh']],
+              alpha=0.85, width=0.6)
+ax.set_xticks(range(len(monthly)))
+ax.set_xticklabels(monthly.index, rotation=45, ha='right', fontsize=8)
+ax.set_ylabel('Énergie (kWh)', color=MUTED)
+ax.set_title('Énergie mensuelle', color=TEXT, fontsize=10)
+ax.axhline(monthly['E_kWh'].mean(), color=AMBER, ls='--', lw=1.2)
+for bar, val in zip(bars, monthly['E_kWh']):
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+            f'{val:.0f}', ha='center', va='bottom', fontsize=8, color=TEXT)
+ax.grid(axis='y')
+
+# Subplot 2 — PR mensuel
+ax2 = axes2[1]
+colors_pr = [GREEN if v >= 0.75 else AMBER if v >= 0.65 else RED for v in monthly['PR_moy']]
+ax2.bar(range(len(monthly)), monthly['PR_moy']*100, color=colors_pr, alpha=0.85, width=0.6)
+ax2.set_xticks(range(len(monthly)))
+ax2.set_xticklabels(monthly.index, rotation=45, ha='right', fontsize=8)
+ax2.set_ylabel('PR (%)', color=MUTED)
+ax2.set_title('Performance Ratio mensuel', color=TEXT, fontsize=10)
+ax2.axhline(75, color=GREEN, ls=':', lw=1, alpha=0.6, label='Cible 75 %')
+ax2.axhline(65, color=RED,   ls=':', lw=1, alpha=0.6, label='Seuil 65 %')
+ax2.legend(fontsize=8, facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax2.set_ylim(0, 100)
+ax2.grid(axis='y')
+
+# Subplot 3 — Heatmap POA horaire (moyenne par heure et mois)
+df_final['Mois']  = df_final.index.month
+df_final['Heure'] = df_final.index.hour
+pivot = df_final.groupby(['Mois', 'Heure'])['POA'].mean().unstack(fill_value=0)
+im = axes2[2].imshow(pivot.values, aspect='auto', cmap='YlOrRd', origin='lower')
+axes2[2].set_xlabel('Heure (UTC)', color=MUTED)
+axes2[2].set_ylabel('Mois', color=MUTED)
+axes2[2].set_title('Rayonnement POA moyen (W/m²)', color=TEXT, fontsize=10)
+axes2[2].set_xticks(range(0, 24, 3))
+axes2[2].set_xticklabels([f'{h}h' for h in range(0, 24, 3)], fontsize=8)
+axes2[2].set_yticks(range(12))
+axes2[2].set_yticklabels(['Jan','Fév','Mar','Avr','Mai','Jun',
+                           'Jul','Aoû','Sep','Oct','Nov','Déc'], fontsize=8)
+plt.colorbar(im, ax=axes2[2], label='W/m²')
+for a in axes2[:2]:
+    for spine in a.spines.values():
+        spine.set_edgecolor(BORDER)
+
+plt.tight_layout()
+fig2.savefig('digital_twin_mohammedia/fig2_analyse_mensuelle.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("✓ Figure 2 sauvegardée")
+
+# ── FIG 3 : Journée type (profil horaire moyen) ────────────────
+fig3, axes3 = plt.subplots(1, 2, figsize=(12, 4), facecolor=DARK_BG)
+fig3.suptitle(f'Profil horaire moyen — {SITE_NAME}', fontsize=13,
+              fontweight='bold', color=TEXT)
+
+hourly_mean = df_final.groupby('Heure')[['POA', 'P_AC', 'T_module', 'Temp']].mean()
+
+ax = axes3[0]
+ax.fill_between(hourly_mean.index, hourly_mean['POA'], alpha=0.25, color=AMBER)
+ax.plot(hourly_mean.index, hourly_mean['POA'], color=AMBER, lw=2, label='POA (W/m²)')
+ax2b = ax.twinx()
+ax2b.plot(hourly_mean.index, hourly_mean['P_AC'], color=GREEN, lw=2, label='P_AC (W)')
+ax2b.fill_between(hourly_mean.index, hourly_mean['P_AC'], alpha=0.15, color=GREEN)
+ax2b.tick_params(colors=MUTED)
+ax2b.yaxis.label.set_color(MUTED)
+ax2b.set_ylabel('Puissance AC (W)', color=MUTED)
+ax2b.spines['right'].set_edgecolor(BORDER)
+ax2b.spines['left'].set_edgecolor(BORDER)
+ax.set_xlabel('Heure', color=MUTED)
+ax.set_ylabel('POA (W/m²)', color=MUTED)
+ax.set_title('Rayonnement & Puissance', color=TEXT, fontsize=10)
+ax.set_xticks(range(0, 24, 2))
+lines1, labels1 = ax.get_legend_handles_labels()
+lines2, labels2 = ax2b.get_legend_handles_labels()
+ax.legend(lines1+lines2, labels1+labels2, fontsize=9,
+          facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax.grid(axis='y')
+
+ax3b = axes3[1]
+ax3b.plot(hourly_mean.index, hourly_mean['Temp'],     color=BLUE,  lw=2, label='Temp. air (°C)')
+ax3b.plot(hourly_mean.index, hourly_mean['T_module'], color=RED,   lw=2, label='Temp. module (°C)')
+ax3b.fill_between(hourly_mean.index,
+                  hourly_mean['Temp'], hourly_mean['T_module'],
+                  alpha=0.15, color=RED, label='ΔT module/air')
+ax3b.set_xlabel('Heure', color=MUTED)
+ax3b.set_ylabel('Température (°C)', color=MUTED)
+ax3b.set_title('Températures horaires moyennes', color=TEXT, fontsize=10)
+ax3b.set_xticks(range(0, 24, 2))
+ax3b.legend(fontsize=9, facecolor=PANEL_BG, edgecolor=BORDER, labelcolor=TEXT)
+ax3b.grid(axis='y')
+
+for a in axes3:
+    a.tick_params(colors=MUTED)
+    for spine in a.spines.values():
+        spine.set_edgecolor(BORDER)
+
+plt.tight_layout()
+fig3.savefig('digital_twin_mohammedia/fig3_profil_horaire.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("✓ Figure 3 sauvegardée")
+
+# ════════════════════════════════════════════════════════════════════
+# 11. RAPPORT SYNTHÉTIQUE
+# ════════════════════════════════════════════════════════════════════
+print("\n" + "═"*60)
+print(f"  RAPPORT DIGITAL TWIN PV — {SITE_NAME.upper()}")
+print("═"*60)
+print(f"  Période analysée     : {DATE_START} → {DATE_END}")
+print(f"  Heures simulées      : {len(df_final):,}")
+print(f"  Puissance nominale   : {Pnom:.0f} W")
+print("─"*60)
+print(f"  Énergie totale AC    : {daily['E_kWh'].sum():.1f} kWh")
+print(f"  Production moy./jour : {daily['E_kWh'].mean():.2f} kWh/j")
+print(f"  Production max/jour  : {daily['E_kWh'].max():.2f} kWh")
+print(f"  PR moyen             : {daily['PR'].mean()*100:.1f} %")
+print(f"  Ys moyen             : {daily['Ys'].mean():.2f} h/j")
+print(f"  T module moy.        : {df_final['T_module'].mean():.1f} °C")
+print(f"  T module max.        : {df_final['T_module'].max():.1f} °C")
+print(f"  Anomalies détectées  : {n_anomalies} jours")
+print("─"*60)
+print(f"  Mois le + productif  : {monthly['E_kWh'].idxmax()}")
+print(f"  Mois le - productif  : {monthly['E_kWh'].idxmin()}")
+print("═"*60)
+
+# Sauvegarde CSV
+daily.to_csv('digital_twin_mohammedia/resultats_journaliers.csv')
+monthly.to_csv('digital_twin_mohammedia/resultats_mensuels.csv')
+print("\n✓ Résultats exportés dans digital_twin_mohammedia/")
