@@ -361,46 +361,35 @@ st.markdown("""
 # PARAMETRES DE LA CENTRALE - MOHAMMEDIA
 # ─────────────────────────────────────────────
 SITE = {
-    "name": "Centrale PV Mohammedia",
-    "location": "Mohammedia, Maroc",
-    "lat": 33.6861,
-    "lon": -7.3833,
-    "altitude": 15,
+    "name": "Installation PV Casablanca",
+    "location": "Casablanca, Maroc",
+    "lat": 33.704780,
+    "lon": -7.361500,
+    "altitude": 56,
     "timezone": "Africa/Casablanca",
-    "capacity_kwp": 500,
-    "surface_m2": 3000,
-    "num_panels": 1250,
-    "num_inverters": 22,
-    "commissioning_date": "01/04/2023",
-    "operator": "SOLARIS Digital Twin",
-    "grid_connection": "HTB 60 kV",
-    "transformer_kva": 630,
+    "capacity_kwp": 3.95,      # au lieu de 500
+    "surface_m2": 23.27,       # 12 × 1.939
+    "num_panels": 12,          # au lieu de 1250
+    "num_inverters": 1,        # au lieu de 22
 }
 
 PANEL = {
-    "manufacturer": "Jinko Solar",
-    "model": "Tiger Neo N-type 72HL4-BDV",
-    "pdc0": 400,
-    "voc": 49.2,
-    "isc": 10.25,
-    "vmp": 41.3,
-    "imp": 9.69,
-    "efficiency_pct": 20.7,
-    "gamma_pdc": -0.0035,
-    "tilt": 30,
+    "manufacturer": "Cell Amrecan",
+    "model": "OS-P72-330W",
+    "pdc0": 330,               # au lieu de 400
+    "gamma_pdc": -0.0040,      # au lieu de -0.0035
+    "tilt": 31,                # au lieu de 30
     "azimuth": 180,
-    "technology": "Monocristallin N-type",
-    "warranty_years": 25,
-    "degradation_pct_yr": 0.40,
+    "efficiency_pct": 17.0,    # au lieu de 20.7
 }
 
 INVERTER = {
-    "manufacturer": "SMA",
-    "model": "Sunny Tripower CORE2 50",
-    "power_kva": 50,
-    "efficiency_pct": 98.6,
+    "manufacturer": "IMEON",
+    "model": "IMEON 3.6",
+    "power_kva": 4,
+    "efficiency_pct": 96,
     "mppt_channels": 2,
-    "voltage_dc_max": 1000,
+    "voltage_dc_max": 500,
     "ip_class": "IP65",
 }
 
