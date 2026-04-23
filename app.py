@@ -1,465 +1,830 @@
+"""
+╔══════════════════════════════════════════════════════════════════╗
+║     SOLARIS - Digital Twin PV · Mohammedia, Maroc               ║
+║     Streamlit + pvlib · Open-Meteo API                          ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
 import plotly.graph_objects as go
-from datetime import datetime
-import time
+import plotly.express as px
+from datetime import datetime, timedelta
+import pvlib
+from pvlib.location import Location
+from pvlib.pvsystem import PVSystem
+from pvlib.modelchain import ModelChain
+from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
+# ─────────────────────────────────────────────
+# CONFIGURATION STREAMLIT
+# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="SOLARIS – Digital Twin",
+    page_title="SOLARIS · Digital Twin Mohammedia",
     page_icon="☀️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ── CSS GLOBAL ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# CSS PERSONNALISÉ
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Import font */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'IBM Plex Sans', sans-serif;
-}
+    :root {
+        --solar-yellow: #F5A623;
+        --solar-orange: #E8860A;
+        --dark-bg: #0D1117;
+        --card-bg: #161B22;
+        --border: #30363D;
+        --text-primary: #E6EDF3;
+        --text-secondary: #8B949E;
+        --green: #3FB950;
+        --red: #F85149;
+        --blue: #58A6FF;
+    }
 
-/* Dark background */
-.stApp {
-    background-color: #0d1117;
-    color: #e8edf5;
-}
+    .stApp { background-color: var(--dark-bg); font-family: 'Inter', sans-serif; }
 
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background-color: #161b22 !important;
-    border-right: 1px solid #2a3547;
-}
-[data-testid="stSidebar"] .stRadio label {
-    color: #8fa3bf !important;
-    font-size: 13px;
-}
-[data-testid="stSidebar"] .stRadio label:hover {
-    color: #e8edf5 !important;
-}
+    .main-header {
+        background: linear-gradient(135deg, #0D1117 0%, #161B22 50%, #1C2128 100%);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px 28px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
 
-/* Hide default streamlit elements */
-#MainMenu, footer, header {visibility: hidden;}
-.block-container {padding-top: 1rem; padding-bottom: 0.5rem;}
+    .plant-name { font-size: 24px; font-weight: 700; color: var(--solar-yellow); }
+    .plant-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
 
-/* Metric cards */
-[data-testid="metric-container"] {
-    background-color: #161b22;
-    border: 1px solid #2a3547;
-    border-radius: 10px;
-    padding: 14px 16px !important;
-}
-[data-testid="metric-container"] label {
-    color: #8fa3bf !important;
-    font-size: 11px !important;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    color: #e8edf5 !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 22px !important;
-    font-weight: 500 !important;
-}
-[data-testid="metric-container"] [data-testid="stMetricDelta"] {
-    font-size: 11px !important;
-}
+    .metric-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        text-align: center;
+    }
+    .metric-value { font-size: 28px; font-weight: 700; color: var(--solar-yellow); }
+    .metric-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric-delta { font-size: 13px; margin-top: 6px; }
+    .delta-up { color: var(--green); }
+    .delta-down { color: var(--red); }
 
-/* Section titles */
-.section-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1.4px;
-    color: #5a7494;
-    font-weight: 500;
-    margin-bottom: 8px;
-    margin-top: 4px;
-    border-bottom: 1px solid #2a3547;
-    padding-bottom: 6px;
-}
+    .section-title {
+        font-size: 16px; font-weight: 600; color: var(--text-primary);
+        margin-bottom: 12px; padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+    }
 
-/* Alert cards */
-.alert-warn {
-    background: rgba(234,179,8,0.08);
-    border-left: 3px solid #eab308;
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-}
-.alert-err {
-    background: rgba(239,68,68,0.08);
-    border-left: 3px solid #ef4444;
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-}
-.alert-name-warn { color: #eab308; font-size: 12px; font-weight: 500; }
-.alert-name-err  { color: #ef4444; font-size: 12px; font-weight: 500; }
-.alert-time { color: #5a7494; font-size: 10px; font-family: 'IBM Plex Mono', monospace; float: right; }
-.alert-desc { color: #8fa3bf; font-size: 11px; margin-top: 2px; }
+    .alert-card {
+        border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+        font-size: 13px; border-left: 3px solid;
+    }
+    .alert-warning { background: #2D2008; border-color: var(--solar-yellow); color: #E3AC5C; }
+    .alert-error   { background: #2D0A0A; border-color: var(--red); color: #F07878; }
+    .alert-ok      { background: #0A2014; border-color: var(--green); color: #5DD78A; }
 
-/* Weather card */
-.weather-card {
-    background: #161b22;
-    border: 1px solid #2a3547;
-    border-radius: 10px;
-    padding: 14px 16px;
-}
-.weather-temp {
-    font-size: 34px;
-    font-weight: 300;
-    font-family: 'IBM Plex Mono', monospace;
-    color: #e8edf5;
-    line-height: 1;
-}
-.weather-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    padding: 4px 0;
-    border-bottom: 1px solid #2a3547;
-}
-.weather-label { color: #5a7494; }
-.weather-val { color: #e8edf5; font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+    .status-dot {
+        display: inline-block; width: 8px; height: 8px;
+        border-radius: 50%; margin-right: 6px;
+    }
+    .status-ok     { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-warn   { background: var(--solar-yellow); box-shadow: 0 0 6px var(--solar-yellow); }
+    .status-error  { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
-/* Status header */
-.status-header {
-    background: #161b22;
-    border: 1px solid #2a3547;
-    border-radius: 10px;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-.status-ok { color: #22c55e; font-size: 12px; font-weight: 500; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 6px; }
+    /* Sidebar */
+    .css-1d391kg, [data-testid="stSidebar"] {
+        background-color: #0D1117 !important;
+        border-right: 1px solid var(--border) !important;
+    }
 
-/* Inverter legend rows */
-.inv-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    padding: 3px 0;
-}
-.inv-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-}
+    div[data-testid="metric-container"] {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+    }
+
+    div[data-testid="metric-container"] label {
+        color: var(--text-secondary) !important;
+        font-size: 12px !important;
+        text-transform: uppercase;
+    }
+
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+        color: var(--solar-yellow) !important;
+        font-size: 26px !important;
+        font-weight: 700 !important;
+    }
+
+    .stPlotlyChart { border-radius: 10px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── SIDEBAR ──────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# PARAMÈTRES DE LA CENTRALE - MOHAMMEDIA
+# ─────────────────────────────────────────────
+SITE = {
+    "name": "Centrale PV Mohammedia",
+    "lat": 33.6861,
+    "lon": -7.3833,
+    "altitude": 15,        # m (ville côtière)
+    "timezone": "Africa/Casablanca",
+    "capacity_kwp": 500,   # kWp installé
+    "surface_m2": 3000,    # m²
+    "num_panels": 1250,    # panneaux
+    "num_inverters": 22,
+}
+
+PANEL = {
+    "pdc0": 400,           # W crête par panneau
+    "gamma_pdc": -0.0035,  # coeff température
+    "tilt": 30,            # inclinaison
+    "azimuth": 180,        # plein sud
+}
+
+
+# ─────────────────────────────────────────────
+# FONCTIONS PRINCIPALES
+# ─────────────────────────────────────────────
+
+@st.cache_data(ttl=3600)
+def fetch_meteo(lat, lon, start_date, end_date):
+    """Récupère les données météo via Open-Meteo API."""
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start_date,
+        "end_date": end_date,
+        "hourly": "temperature_2m,shortwave_radiation,diffuse_radiation,direct_normal_irradiance,wind_speed_10m,relative_humidity_2m",
+        "timezone": "Africa/Casablanca",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        df = pd.DataFrame({
+            "datetime": pd.to_datetime(data["hourly"]["time"]),
+            "temp_air": data["hourly"]["temperature_2m"],
+            "ghi": data["hourly"]["shortwave_radiation"],
+            "dhi": data["hourly"]["diffuse_radiation"],
+            "dni": data["hourly"]["direct_normal_irradiance"],
+            "wind_speed": data["hourly"]["wind_speed_10m"],
+            "humidity": data["hourly"]["relative_humidity_2m"],
+        })
+        df = df.set_index("datetime")
+        return df
+    except Exception as e:
+        st.error(f"⚠️ Erreur API météo : {e}")
+        return None
+
+
+@st.cache_data(ttl=3600)
+def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamma_pdc, start_date, end_date):
+    """Simule la production PV avec pvlib."""
+    location = Location(
+        latitude=lat,
+        longitude=lon,
+        altitude=altitude,
+        tz=timezone,
+        name="Mohammedia"
+    )
+
+    # Récupération météo
+    df = fetch_meteo(lat, lon, start_date, end_date)
+    if df is None:
+        return None
+
+    # Calcul position solaire
+    times = df.index
+    solar_pos = location.get_solarposition(times)
+
+    # Irradiance sur plan incliné (transposition)
+    poa = pvlib.irradiance.get_total_irradiance(
+        surface_tilt=tilt,
+        surface_azimuth=azimuth,
+        dni=df["dni"],
+        ghi=df["ghi"],
+        dhi=df["dhi"],
+        solar_zenith=solar_pos["apparent_zenith"],
+        solar_azimuth=solar_pos["azimuth"],
+    )
+
+    # Température cellule (modèle Sandia)
+    temp_params = pvlib.temperature.TEMPERATURE_MODEL_PARAMETERS["sapm"]["open_rack_glass_glass"]
+    cell_temp = pvlib.temperature.sapm_cell(
+        poa_global=poa["poa_global"],
+        temp_air=df["temp_air"],
+        wind_speed=df["wind_speed"],
+        a=temp_params["a"],
+        b=temp_params["b"],
+        deltaT=temp_params["deltaT"],
+    )
+
+    # Puissance DC (modèle simple)
+    dc_power = pvlib.pvsystem.pvwatts_dc(
+        g_poa_effective=poa["poa_global"],
+        temp_cell=cell_temp,
+        pdc0=pdc0,
+        gamma_pdc=gamma_pdc,
+    )
+
+    # Rendement onduleur ~ 97%
+    ac_power = dc_power * 0.97
+
+    # Assemblage résultats
+    results = pd.DataFrame({
+        "datetime": times,
+        "ghi": df["ghi"],
+        "poa_global": poa["poa_global"],
+        "temp_air": df["temp_air"],
+        "cell_temp": cell_temp,
+        "wind_speed": df["wind_speed"],
+        "dc_power_w": dc_power,
+        "ac_power_w": ac_power.clip(lower=0),
+    })
+    results["ac_power_kw"] = results["ac_power_w"] / 1000
+    results["date"] = results["datetime"].dt.date
+    results["hour"] = results["datetime"].dt.hour
+    results["month"] = results["datetime"].dt.month
+    results["month_name"] = results["datetime"].dt.strftime("%b")
+
+    return results
+
+
+def compute_daily(results, num_panels):
+    """Agrégation journalière."""
+    daily = results.groupby("date").agg(
+        production_kwh=("ac_power_kw", lambda x: x.sum()),
+        peak_power_kw=("ac_power_kw", "max"),
+        avg_temp=("temp_air", "mean"),
+        avg_ghi=("ghi", "mean"),
+        peak_sun_hours=("poa_global", lambda x: x.sum() / 1000),
+    ).reset_index()
+
+    # Performance Ratio = production réelle / production théorique
+    daily["theoretical_kwh"] = daily["peak_sun_hours"] * (num_panels * 0.4)  # 400W par panneau
+    daily["pr"] = (daily["production_kwh"] / daily["theoretical_kwh"].replace(0, np.nan)).clip(0, 1) * 100
+    daily["date"] = pd.to_datetime(daily["date"])
+
+    return daily
+
+
+def compute_monthly(daily):
+    """Agrégation mensuelle."""
+    monthly = daily.groupby(daily["date"].dt.to_period("M")).agg(
+        production_kwh=("production_kwh", "sum"),
+        avg_pr=("pr", "mean"),
+        avg_temp=("avg_temp", "mean"),
+    ).reset_index()
+    monthly["date"] = monthly["date"].dt.to_timestamp()
+    monthly["month_name"] = monthly["date"].dt.strftime("%b %Y")
+    return monthly
+
+
+def get_current_meteo(lat, lon):
+    """Météo actuelle via Open-Meteo."""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,shortwave_radiation",
+        "timezone": "Africa/Casablanca",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json().get("current", {})
+    except:
+        return {}
+
+
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 20px;">
-        <svg width="32" height="32" viewBox="0 0 32 32">
-            <circle cx="16" cy="16" r="14" fill="#f59e0b" opacity=".15"/>
-            <circle cx="16" cy="16" r="8" fill="#f59e0b" opacity=".85"/>
-            <line x1="16" y1="1" x2="16" y2="6" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="16" y1="26" x2="16" y2="31" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="1" y1="16" x2="6" y2="16" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="26" y1="16" x2="31" y2="16" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-        <div>
-            <div style="font-size:18px;font-weight:600;color:#e8edf5;letter-spacing:0.5px">
-                SOLAR<span style="color:#f59e0b">IS</span>
-            </div>
-            <div style="font-size:9px;color:#5a7494;letter-spacing:1.5px;text-transform:uppercase">Digital Twin</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### ☀️ SOLARIS")
+    st.markdown(f"**{SITE['name']}**")
+    st.markdown(f"📍 Mohammedia, Maroc")
+    st.markdown("---")
 
     menu = st.radio(
-        "",
-        ["🔲  Vue d'ensemble", "📈  Monitoring", "📊  Analyse",
-         "🔧  Maintenance", "🔔  Alertes", "📄  Rapports", "⚙️  Paramètres"],
-        index=0,
+        "Navigation",
+        ["🏠 Vue Globale", "📊 Production", "🌤️ Météo & Irradiance", "⚙️ Onduleurs", "📋 Rapport"],
         label_visibility="collapsed"
     )
 
-    st.markdown("<hr style='border-color:#2a3547;margin:16px 0'>", unsafe_allow_html=True)
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:10px;padding:4px 0">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1e40af,#3b82f6);
-             display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0">Ad</div>
-        <div>
-            <div style="font-size:13px;font-weight:500;color:#e8edf5">Admin</div>
-            <div style="font-size:11px;color:#5a7494">Administrateur</div>
-        </div>
-    </div>
-    <div style="margin-top:12px;font-size:11px;color:#5a7494">
-        <span style="cursor:pointer">☾ Thème sombre</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("**Période d'analyse**")
+
+    col_s, col_e = st.columns(2)
+    with col_s:
+        start_date = st.date_input("Début", value=datetime(2024, 1, 1), label_visibility="collapsed")
+    with col_e:
+        end_date = st.date_input("Fin", value=datetime(2024, 12, 31), label_visibility="collapsed")
+
+    st.markdown(f"Du **{start_date.strftime('%d/%m/%Y')}** au **{end_date.strftime('%d/%m/%Y')}**")
+
+    st.markdown("---")
+    st.markdown("**Paramètres centrale**")
+    st.markdown(f"⚡ Capacité : **{SITE['capacity_kwp']} kWp**")
+    st.markdown(f"🔲 Panneaux : **{SITE['num_panels']}**")
+    st.markdown(f"🔌 Onduleurs : **{SITE['num_inverters']}**")
+    st.markdown(f"📐 Inclinaison : **{PANEL['tilt']}°**")
+
+    st.markdown("---")
+    auto_refresh = st.checkbox("🔄 Auto-actualisation (5 min)", value=False)
+    if auto_refresh:
+        st.rerun()
 
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
-now = datetime.now().strftime("%d/%m/%Y  %H:%M:%S")
-st.markdown(f"""
-<div class="status-header">
-    <div>
-        <div style="font-size:16px;font-weight:600;color:#e8edf5;letter-spacing:.3px">
-            ⚡ Centrale Photovoltaïque — Sunfield 1
-        </div>
-        <div style="font-size:11px;color:#5a7494;margin-top:3px">
-            Lieu: Toulouse, France &nbsp;|&nbsp; Puissance installée: 2.35 MWc &nbsp;|&nbsp; Mise en service: 04/2023
-        </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:24px">
-        <div style="font-size:13px;color:#e8edf5">☀️ 23°C</div>
-        <div style="font-size:12px;color:#8fa3bf;font-family:'IBM Plex Mono',monospace">{now}</div>
-        <div class="status-ok"><span class="status-dot"></span>Système normal</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ── TOP METRICS ───────────────────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    st.metric("⚡ Puissance actuelle", "1.65 MW", "+0.12 MW")
-with c2:
-    st.metric("📅 Production du jour", "7.48 MWh", "+0.3 MWh")
-with c3:
-    st.metric("📦 Production totale", "1.25 GWh", "+7.48 MWh")
-with c4:
-    st.metric("🎯 PR (Performance Ratio)", "82.6 %", "-1.2 %")
-
-st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
-
-
-# ── MAIN AREA: Image + Bottom Panels ─────────────────────────────────────────
-# Aerial photo with overlay chips
-st.markdown("""
-<div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid #2a3547;margin-bottom:12px">
-    <img src="https://images.unsplash.com/photo-1509395176047-4a66953fd231?w=1200&q=80"
-         style="width:100%;height:240px;object-fit:cover;opacity:.8;display:block"/>
-    <div style="position:absolute;top:10px;left:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <div style="background:rgba(13,17,23,.82);border:1px solid #3a4d66;border-radius:8px;
-             padding:5px 12px;font-size:12px;color:#e8edf5;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)">
-            🌡️ 23.4 °C
-        </div>
-        <div style="background:rgba(13,17,23,.82);border:1px solid #3a4d66;border-radius:8px;
-             padding:5px 12px;font-size:12px;color:#e8edf5;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)">
-            ☀️ Irradiance 812 W/m²
-        </div>
-        <div style="background:rgba(13,17,23,.82);border:1px solid #3a4d66;border-radius:8px;
-             padding:5px 12px;font-size:12px;color:#22c55e;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)">
-            🔌 Onduleur 2 — 98.6 %
-        </div>
-    </div>
-    <div style="position:absolute;bottom:10px;right:10px;background:rgba(13,17,23,.7);
-         border-radius:6px;padding:4px 10px;font-size:10px;color:#5a7494">
-        Vue 3D · Toulouse, France
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ── BOTTOM PANELS ────────────────────────────────────────────────────────────
-col_weather, col_inv, col_prod = st.columns(3)
-
-# -- Météo
-with col_weather:
-    st.markdown('<div class="section-title">Météo locale</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="weather-card">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-            <div style="font-size:36px">☀️</div>
-            <div>
-                <div class="weather-temp">23°C</div>
-                <div style="font-size:11px;color:#5a7494">Ensoleillé</div>
-            </div>
-        </div>
-        <div class="weather-row">
-            <span class="weather-label">Irradiance</span>
-            <span class="weather-val">812 W/m²</span>
-        </div>
-        <div class="weather-row">
-            <span class="weather-label">Vitesse du vent</span>
-            <span class="weather-val">12 km/h</span>
-        </div>
-        <div class="weather-row">
-            <span class="weather-label">Humidité</span>
-            <span class="weather-val">45 %</span>
-        </div>
-        <div class="weather-row" style="border-bottom:none">
-            <span class="weather-label">Température module</span>
-            <span class="weather-val">34.2 °C</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# -- Onduleurs
-with col_inv:
-    st.markdown('<div class="section-title">État des onduleurs</div>', unsafe_allow_html=True)
-    fig_inv = go.Figure(go.Pie(
-        values=[22, 1, 1, 0],
-        labels=["En fonctionnement", "Avertissement", "Hors ligne", "Maintenance"],
-        hole=0.68,
-        marker=dict(colors=["#22c55e", "#eab308", "#ef4444", "#3a4d66"],
-                    line=dict(color="#0d1117", width=2)),
-        textinfo="none",
-        hovertemplate="<b>%{label}</b>: %{value}<extra></extra>",
-        sort=False,
-    ))
-    fig_inv.add_annotation(text="24", x=0.5, y=0.55, font=dict(size=26, color="#e8edf5",
-                           family="IBM Plex Mono"), showarrow=False)
-    fig_inv.add_annotation(text="Total", x=0.5, y=0.38, font=dict(size=11, color="#5a7494",
-                           family="IBM Plex Sans"), showarrow=False)
-    fig_inv.update_layout(
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=150,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+# ─────────────────────────────────────────────
+# SIMULATION PVLIB
+# ─────────────────────────────────────────────
+with st.spinner("⚙️ Simulation pvlib en cours..."):
+    results = run_pvlib_simulation(
+        lat=SITE["lat"],
+        lon=SITE["lon"],
+        altitude=SITE["altitude"],
+        timezone=SITE["timezone"],
+        tilt=PANEL["tilt"],
+        azimuth=PANEL["azimuth"],
+        pdc0=PANEL["pdc0"],
+        gamma_pdc=PANEL["gamma_pdc"],
+        start_date=str(start_date),
+        end_date=str(end_date),
     )
-    st.plotly_chart(fig_inv, use_container_width=True, config={"displayModeBar": False})
-    st.markdown("""
-    <div style="display:flex;flex-direction:column;gap:5px;margin-top:-10px">
-        <div class="inv-row"><span class="inv-dot" style="background:#22c55e"></span>
-            <span style="color:#e8edf5;font-weight:500">22</span>
-            <span style="color:#5a7494">En fonctionnement</span></div>
-        <div class="inv-row"><span class="inv-dot" style="background:#eab308"></span>
-            <span style="color:#e8edf5;font-weight:500">1</span>
-            <span style="color:#5a7494">Avertissement</span></div>
-        <div class="inv-row"><span class="inv-dot" style="background:#ef4444"></span>
-            <span style="color:#e8edf5;font-weight:500">1</span>
-            <span style="color:#5a7494">Hors ligne</span></div>
-        <div class="inv-row"><span class="inv-dot" style="background:#3a4d66"></span>
-            <span style="color:#e8edf5;font-weight:500">0</span>
-            <span style="color:#5a7494">Maintenance</span></div>
+
+if results is None:
+    st.error("❌ Impossible de récupérer les données. Vérifiez votre connexion internet.")
+    st.stop()
+
+# Échelle au nombre de panneaux
+results["ac_power_kw"] = results["ac_power_kw"] * SITE["num_panels"]
+daily = compute_daily(results, SITE["num_panels"])
+monthly = compute_monthly(daily)
+
+# Météo actuelle
+current_meteo = get_current_meteo(SITE["lat"], SITE["lon"])
+now = datetime.now()
+
+
+# ─────────────────────────────────────────────
+# HEADER PRINCIPAL
+# ─────────────────────────────────────────────
+col_h1, col_h2, col_h3 = st.columns([3, 1, 1])
+with col_h1:
+    st.markdown(f"""
+    <div class="main-header" style="display:block">
+        <div class="plant-name">☀️ {SITE['name']}</div>
+        <div class="plant-sub">📍 Mohammedia · {SITE['lat']}°N, {abs(SITE['lon'])}°W · {SITE['altitude']} m · {SITE['capacity_kwp']} kWp</div>
     </div>
     """, unsafe_allow_html=True)
+with col_h2:
+    st.metric("🌡️ Temp. actuelle",
+              f"{current_meteo.get('temperature_2m', '--')} °C")
+with col_h3:
+    ghi_now = current_meteo.get('shortwave_radiation', 0)
+    status = "🟢 En production" if ghi_now and ghi_now > 50 else "🔵 Hors production"
+    st.metric("☀️ Irradiance", f"{ghi_now} W/m²", status)
 
-# -- Répartition production
-with col_prod:
-    st.markdown('<div class="section-title">Répartition de la production</div>', unsafe_allow_html=True)
-    fig_donut = go.Figure(go.Pie(
-        values=[693, 627, 330],
-        labels=["Champ 1", "Champ 2", "Champ 3"],
-        hole=0.6,
-        marker=dict(colors=["#378add", "#22c55e", "#eab308"],
-                    line=dict(color="#0d1117", width=2)),
-        textinfo="none",
-        hovertemplate="<b>%{label}</b>: %{value} kW (%{percent})<extra></extra>",
-        sort=False,
-    ))
-    fig_donut.update_layout(
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=140,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
-    st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
 
-    for name, pct, kw, color in [("Champ 1","42 %","693 kW","#378add"),
-                                   ("Champ 2","38 %","627 kW","#22c55e"),
-                                   ("Champ 3","20 %","330 kW","#eab308")]:
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;justify-content:space-between;
-             font-size:12px;padding:4px 0;border-bottom:1px solid #2a3547">
-            <div style="display:flex;align-items:center;gap:7px">
-                <span style="width:9px;height:9px;border-radius:2px;background:{color};display:inline-block"></span>
-                <span style="color:#8fa3bf">{name}</span>
-            </div>
-            <div style="display:flex;gap:12px">
-                <span style="font-family:'IBM Plex Mono',monospace;color:#e8edf5;font-weight:500">{pct}</span>
-                <span style="font-family:'IBM Plex Mono',monospace;color:#5a7494">{kw}</span>
-            </div>
+# ─────────────────────────────────────────────
+# VUE GLOBALE
+# ─────────────────────────────────────────────
+if "Vue Globale" in menu:
+
+    # KPIs principaux
+    total_kwh = daily["production_kwh"].sum()
+    avg_pr = daily["pr"].mean()
+    peak_day_kwh = daily["production_kwh"].max()
+    peak_day_date = daily.loc[daily["production_kwh"].idxmax(), "date"].strftime("%d/%m/%Y")
+    avg_daily_kwh = daily["production_kwh"].mean()
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("⚡ Production totale", f"{total_kwh/1000:.1f} MWh")
+    k2.metric("📈 Performance Ratio", f"{avg_pr:.1f} %")
+    k3.metric("🏆 Meilleur jour", f"{peak_day_kwh:.0f} kWh", peak_day_date)
+    k4.metric("📊 Moy. journalière", f"{avg_daily_kwh:.0f} kWh")
+    k5.metric("☀️ Capacité", f"{SITE['capacity_kwp']} kWp", f"{SITE['num_panels']} panneaux")
+
+    st.markdown("---")
+
+    col_left, col_right = st.columns([2, 1])
+
+    with col_left:
+        st.markdown('<div class="section-title">📈 Production journalière (kWh)</div>', unsafe_allow_html=True)
+        fig_daily = go.Figure()
+        fig_daily.add_trace(go.Bar(
+            x=daily["date"], y=daily["production_kwh"],
+            name="Production",
+            marker_color=np.where(
+                daily["production_kwh"] < daily["production_kwh"].quantile(0.2),
+                "#F85149",
+                np.where(
+                    daily["production_kwh"] > daily["production_kwh"].quantile(0.8),
+                    "#3FB950", "#F5A623"
+                )
+            ),
+            opacity=0.85,
+        ))
+        fig_daily.add_trace(go.Scatter(
+            x=daily["date"],
+            y=daily["production_kwh"].rolling(7, center=True).mean(),
+            name="Moy. mobile 7j",
+            line=dict(color="#58A6FF", width=2),
+        ))
+        fig_daily.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#161B22",
+            plot_bgcolor="#161B22",
+            showlegend=True,
+            height=320,
+            margin=dict(t=20, b=30, l=50, r=20),
+            xaxis=dict(gridcolor="#30363D"),
+            yaxis=dict(gridcolor="#30363D", title="kWh"),
+        )
+        st.plotly_chart(fig_daily, use_container_width=True)
+
+    with col_right:
+        st.markdown('<div class="section-title">📅 Production mensuelle (MWh)</div>', unsafe_allow_html=True)
+        fig_month = go.Figure(go.Bar(
+            x=monthly["month_name"],
+            y=monthly["production_kwh"] / 1000,
+            marker_color="#F5A623",
+            text=(monthly["production_kwh"] / 1000).round(1).astype(str),
+            textposition="outside",
+            textfont=dict(color="#E6EDF3", size=11),
+        ))
+        fig_month.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#161B22",
+            plot_bgcolor="#161B22",
+            height=320,
+            margin=dict(t=20, b=30, l=40, r=10),
+            xaxis=dict(gridcolor="#30363D"),
+            yaxis=dict(gridcolor="#30363D", title="MWh"),
+        )
+        st.plotly_chart(fig_month, use_container_width=True)
+
+    # Alertes
+    st.markdown('<div class="section-title">🚨 Alertes système</div>', unsafe_allow_html=True)
+    low_pr_days = daily[daily["pr"] < 70]
+    alerts_col1, alerts_col2 = st.columns([2, 1])
+
+    with alerts_col1:
+        if len(low_pr_days) > 0:
+            st.markdown(f"""
+            <div class="alert-card alert-warning">
+                ⚠️ <b>{len(low_pr_days)} jours</b> avec Performance Ratio < 70%
+                — Dernier : {low_pr_days["date"].max().strftime('%d/%m/%Y')}
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="alert-card alert-warning">
+            ⚠️ <b>Onduleur #7</b> — Puissance réduite de 12% (depuis 3 jours)
+        </div>
+        <div class="alert-card alert-ok">
+            ✅ <b>21 onduleurs</b> — Fonctionnement nominal
+        </div>
+        <div class="alert-card alert-ok">
+            ✅ <b>Système de monitoring</b> — Toutes les données reçues
         </div>
         """, unsafe_allow_html=True)
 
+    with alerts_col2:
+        st.markdown("**Statut onduleurs**")
+        fig_inv = go.Figure(go.Pie(
+            values=[21, 1],
+            labels=["Nominaux", "Alerte"],
+            hole=0.65,
+            marker_colors=["#3FB950", "#F5A623"],
+            textinfo="none",
+        ))
+        fig_inv.add_annotation(
+            text=f"<b>22</b><br>Total",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color="#E6EDF3"),
+        )
+        fig_inv.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#161B22",
+            height=200,
+            margin=dict(t=10, b=10, l=10, r=10),
+            showlegend=True,
+            legend=dict(font=dict(size=11, color="#8B949E")),
+        )
+        st.plotly_chart(fig_inv, use_container_width=True)
 
-# ── PRODUCTION CURVE + ALERTS ────────────────────────────────────────────────
-st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
-col_chart, col_alerts = st.columns([2, 1])
 
-with col_chart:
-    st.markdown('<div class="section-title">Courbe de production du jour</div>', unsafe_allow_html=True)
+# ─────────────────────────────────────────────
+# PRODUCTION DÉTAILLÉE
+# ─────────────────────────────────────────────
+elif "Production" in menu:
+    st.markdown("## 📊 Analyse de production")
 
-    hours = list(range(25))
-    labels_h = [f"{h:02d}:00" for h in hours]
-    actual = [0,0,0,0,0,0,0.05,0.3,0.7,1.1,1.5,1.8,2.0,1.85,1.6,1.3,0.9,0.5,0.2,0.05,0,0,0,0,0]
-    forecast=[0,0,0,0,0,0,0.04,0.25,0.65,1.05,1.45,1.75,1.95,1.8,1.55,1.25,0.85,0.45,0.15,0.02,0,0,0,0,0]
+    col1, col2 = st.columns(2)
 
-    fig_prod = go.Figure()
-    fig_prod.add_trace(go.Scatter(
-        x=labels_h, y=actual, name="Production",
-        line=dict(color="#3b82f6", width=2),
-        fill="tozeroy", fillcolor="rgba(59,130,246,0.12)",
-        mode="lines"
+    with col1:
+        st.markdown('<div class="section-title">📈 Performance Ratio journalier (%)</div>', unsafe_allow_html=True)
+        fig_pr = go.Figure()
+        fig_pr.add_trace(go.Scatter(
+            x=daily["date"], y=daily["pr"],
+            fill="tozeroy",
+            fillcolor="rgba(245,166,35,0.15)",
+            line=dict(color="#F5A623", width=1.5),
+            name="PR %",
+        ))
+        fig_pr.add_hline(y=75, line_dash="dash", line_color="#8B949E",
+                         annotation_text="Seuil 75%", annotation_font_color="#8B949E")
+        fig_pr.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+            height=300, margin=dict(t=20, b=30, l=50, r=20),
+            yaxis=dict(gridcolor="#30363D", range=[0, 110]),
+            xaxis=dict(gridcolor="#30363D"),
+        )
+        st.plotly_chart(fig_pr, use_container_width=True)
+
+    with col2:
+        st.markdown('<div class="section-title">🌡️ Corrélation Température / Production</div>', unsafe_allow_html=True)
+        fig_corr = px.scatter(
+            daily, x="avg_temp", y="production_kwh",
+            color="pr", color_continuous_scale="YlOrRd",
+            opacity=0.7, size_max=8,
+            labels={"avg_temp": "Temp moy (°C)", "production_kwh": "Production (kWh)", "pr": "PR %"},
+        )
+        fig_corr.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+            height=300, margin=dict(t=20, b=30, l=50, r=20),
+        )
+        st.plotly_chart(fig_corr, use_container_width=True)
+
+    # Profil horaire moyen
+    st.markdown('<div class="section-title">⏱️ Profil horaire moyen de production (kW)</div>', unsafe_allow_html=True)
+    hourly_avg = results.groupby("hour")["ac_power_kw"].mean().reset_index()
+    hourly_avg.columns = ["hour", "avg_power_kw"]
+
+    fig_hour = go.Figure()
+    fig_hour.add_trace(go.Scatter(
+        x=hourly_avg["hour"], y=hourly_avg["avg_power_kw"],
+        fill="tozeroy",
+        fillcolor="rgba(245,166,35,0.2)",
+        line=dict(color="#F5A623", width=2),
+        mode="lines",
     ))
-    fig_prod.add_trace(go.Scatter(
-        x=labels_h, y=forecast, name="Prévision",
-        line=dict(color="#5a7494", width=1.5, dash="dash"),
-        mode="lines"
-    ))
-    fig_prod.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        height=200,
-        margin=dict(l=32, r=8, t=8, b=32),
-        legend=dict(orientation="h", y=-0.25, x=0,
-                    font=dict(color="#8fa3bf", size=11),
-                    bgcolor="rgba(0,0,0,0)"),
-        xaxis=dict(tickfont=dict(color="#5a7494", size=9), gridcolor="#2a3547",
-                   tickmode="array",
-                   tickvals=[labels_h[i] for i in [0,4,8,12,16,20,24]],
-                   linecolor="#2a3547"),
-        yaxis=dict(tickfont=dict(color="#5a7494", size=9), gridcolor="#2a3547",
-                   ticksuffix=" MW", range=[0, 2.6], linecolor="#2a3547"),
-        hovermode="x unified",
-        hoverlabel=dict(bgcolor="#161b22", bordercolor="#3a4d66",
-                        font=dict(color="#e8edf5", size=11)),
+    fig_hour.update_layout(
+        template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+        height=280, margin=dict(t=20, b=30, l=60, r=20),
+        xaxis=dict(title="Heure", gridcolor="#30363D", dtick=1),
+        yaxis=dict(title="Puissance (kW)", gridcolor="#30363D"),
     )
-    st.plotly_chart(fig_prod, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig_hour, use_container_width=True)
 
-with col_alerts:
-    st.markdown('<div class="section-title">Alertes récentes</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="alert-warn">
-        <div>
-            <span class="alert-name-warn">⚠ Onduleur 7 — Avertissement</span>
-            <span class="alert-time">09:47</span>
-        </div>
-        <div class="alert-desc">Puissance réduite</div>
-    </div>
-    <div class="alert-err">
-        <div>
-            <span class="alert-name-err">⚠ Station météo — Communication perdue</span>
-            <span class="alert-time">08:15</span>
-        </div>
-        <div class="alert-desc">Vérifier la connexion</div>
-    </div>
-    <div class="alert-warn">
-        <div>
-            <span class="alert-name-warn">⚠ Nettoyage champ 2 recommandé</span>
-            <span class="alert-time">Hier 14:32</span>
-        </div>
-        <div class="alert-desc">Perte estimée: 2.3 %</div>
+    # Heatmap production mensuelle/horaire
+    st.markdown('<div class="section-title">🗓️ Heatmap production (Mois × Heure, kWh moyen)</div>', unsafe_allow_html=True)
+    heatmap_data = results.groupby(["month", "hour"])["ac_power_kw"].mean().reset_index()
+    heatmap_pivot = heatmap_data.pivot(index="month", columns="hour", values="ac_power_kw")
+    months_fr = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    heatmap_pivot.index = [months_fr[m - 1] for m in heatmap_pivot.index]
+
+    fig_heat = go.Figure(go.Heatmap(
+        z=heatmap_pivot.values,
+        x=[f"{h}h" for h in heatmap_pivot.columns],
+        y=heatmap_pivot.index,
+        colorscale=[
+            [0, "#0D1117"], [0.3, "#331A00"], [0.6, "#B36B00"], [1, "#F5A623"]
+        ],
+        showscale=True,
+        colorbar=dict(title="kW", tickfont=dict(color="#8B949E")),
+    ))
+    fig_heat.update_layout(
+        template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+        height=300, margin=dict(t=20, b=30, l=60, r=60),
+        xaxis=dict(title="Heure", tickfont=dict(size=10)),
+        yaxis=dict(tickfont=dict(size=10)),
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# MÉTÉO & IRRADIANCE
+# ─────────────────────────────────────────────
+elif "Météo" in menu:
+    st.markdown("## 🌤️ Météo & Irradiance — Mohammedia")
+
+    # Météo actuelle
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("🌡️ Température", f"{current_meteo.get('temperature_2m', '--')} °C")
+    m2.metric("💧 Humidité", f"{current_meteo.get('relative_humidity_2m', '--')} %")
+    m3.metric("🌬️ Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
+    m4.metric("☀️ Irradiance GHI", f"{current_meteo.get('shortwave_radiation', '--')} W/m²")
+
+    # GHI journalier
+    daily_ghi = results.groupby("date").agg(ghi_sum=("ghi", lambda x: x.sum() / 1000)).reset_index()
+    daily_ghi["date"] = pd.to_datetime(daily_ghi["date"])
+
+    st.markdown('<div class="section-title">☀️ Irradiance globale horizontale (kWh/m²/jour)</div>', unsafe_allow_html=True)
+    fig_ghi = go.Figure()
+    fig_ghi.add_trace(go.Scatter(
+        x=daily_ghi["date"], y=daily_ghi["ghi_sum"],
+        fill="tozeroy", fillcolor="rgba(245,166,35,0.2)",
+        line=dict(color="#F5A623", width=1.5),
+    ))
+    fig_ghi.update_layout(
+        template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+        height=280, margin=dict(t=20, b=30, l=60, r=20),
+        yaxis=dict(gridcolor="#30363D", title="kWh/m²"),
+        xaxis=dict(gridcolor="#30363D"),
+    )
+    st.plotly_chart(fig_ghi, use_container_width=True)
+
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.markdown('<div class="section-title">🌡️ Température journalière moyenne (°C)</div>', unsafe_allow_html=True)
+        daily_temp = results.groupby("date").agg(temp_avg=("temp_air", "mean")).reset_index()
+        daily_temp["date"] = pd.to_datetime(daily_temp["date"])
+        fig_temp = go.Figure(go.Scatter(
+            x=daily_temp["date"], y=daily_temp["temp_avg"],
+            line=dict(color="#58A6FF", width=1.5),
+        ))
+        fig_temp.add_hline(y=daily_temp["temp_avg"].mean(),
+                           line_dash="dash", line_color="#F5A623",
+                           annotation_text=f"Moy: {daily_temp['temp_avg'].mean():.1f}°C")
+        fig_temp.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+            height=250, margin=dict(t=20, b=30, l=50, r=20),
+            yaxis=dict(gridcolor="#30363D"),
+        )
+        st.plotly_chart(fig_temp, use_container_width=True)
+
+    with col_r:
+        st.markdown('<div class="section-title">📊 Distribution GHI mensuel (kWh/m²)</div>', unsafe_allow_html=True)
+        monthly_ghi = daily_ghi.copy()
+        monthly_ghi["month"] = monthly_ghi["date"].dt.strftime("%b")
+        monthly_ghi_agg = monthly_ghi.groupby("month")["ghi_sum"].sum().reset_index()
+        fig_mghi = go.Figure(go.Bar(
+            x=monthly_ghi_agg["month"], y=monthly_ghi_agg["ghi_sum"],
+            marker_color="#F5A623",
+        ))
+        fig_mghi.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+            height=250, margin=dict(t=20, b=30, l=50, r=20),
+            yaxis=dict(gridcolor="#30363D", title="kWh/m²"),
+        )
+        st.plotly_chart(fig_mghi, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# ONDULEURS
+# ─────────────────────────────────────────────
+elif "Onduleurs" in menu:
+    st.markdown("## ⚙️ Tableau de bord Onduleurs")
+
+    n = SITE["num_inverters"]
+    np.random.seed(42)
+    inv_power = np.random.normal(95, 8, n).clip(60, 105)
+    inv_power[6] = 78  # onduleur #7 en alerte
+
+    inv_status = ["⚠️" if p < 85 else "✅" for p in inv_power]
+    inv_labels = [f"INV-{i+1:02d}" for i in range(n)]
+
+    # Grille onduleurs
+    st.markdown('<div class="section-title">🔌 État des onduleurs</div>', unsafe_allow_html=True)
+    inv_cols = st.columns(6)
+    for i in range(n):
+        with inv_cols[i % 6]:
+            color = "#F5A623" if inv_power[i] < 85 else "#3FB950"
+            st.markdown(f"""
+            <div style="background:#161B22;border:1px solid #30363D;border-radius:8px;
+                        padding:10px;text-align:center;margin-bottom:8px;border-left:3px solid {color}">
+                <div style="font-size:11px;color:#8B949E">{inv_labels[i]}</div>
+                <div style="font-size:18px;font-weight:700;color:{color}">{inv_power[i]:.0f}%</div>
+                <div style="font-size:14px">{inv_status[i]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('<div class="section-title">📊 Puissance relative par onduleur (%)</div>', unsafe_allow_html=True)
+        fig_inv_bar = go.Figure(go.Bar(
+            x=inv_labels, y=inv_power,
+            marker_color=["#F5A623" if p < 85 else "#3FB950" for p in inv_power],
+        ))
+        fig_inv_bar.add_hline(y=85, line_dash="dash", line_color="#F85149",
+                              annotation_text="Seuil alerte 85%")
+        fig_inv_bar.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22", plot_bgcolor="#161B22",
+            height=300, margin=dict(t=20, b=50, l=50, r=20),
+            xaxis=dict(tickangle=-45, tickfont=dict(size=9)),
+            yaxis=dict(gridcolor="#30363D", range=[50, 110]),
+        )
+        st.plotly_chart(fig_inv_bar, use_container_width=True)
+
+    with col2:
+        st.markdown('<div class="section-title">🥧 Répartition statut onduleurs</div>', unsafe_allow_html=True)
+        ok_count = sum(1 for p in inv_power if p >= 85)
+        warn_count = n - ok_count
+        fig_pie = go.Figure(go.Pie(
+            labels=["Nominaux ✅", "En alerte ⚠️"],
+            values=[ok_count, warn_count],
+            hole=0.6,
+            marker_colors=["#3FB950", "#F5A623"],
+        ))
+        fig_pie.add_annotation(
+            text=f"<b>{n}</b><br>Onduleurs",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color="#E6EDF3"),
+        )
+        fig_pie.update_layout(
+            template="plotly_dark", paper_bgcolor="#161B22",
+            height=300, margin=dict(t=20, b=20, l=20, r=20),
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# RAPPORT
+# ─────────────────────────────────────────────
+elif "Rapport" in menu:
+    st.markdown("## 📋 Rapport de Performance")
+
+    total_kwh = daily["production_kwh"].sum()
+    avg_pr = daily["pr"].mean()
+    best_month = monthly.loc[monthly["production_kwh"].idxmax()]
+    worst_month = monthly.loc[monthly["production_kwh"].idxmin()]
+    avg_daily = daily["production_kwh"].mean()
+
+    st.markdown(f"""
+    <div style="background:#161B22;border:1px solid #30363D;border-radius:12px;padding:24px">
+        <h3 style="color:#F5A623;margin-top:0">📄 Rapport — {SITE['name']}</h3>
+        <p style="color:#8B949E">Période : {start_date.strftime('%d/%m/%Y')} → {end_date.strftime('%d/%m/%Y')}</p>
+        <hr style="border-color:#30363D">
+
+        <h4 style="color:#E6EDF3">⚡ Production</h4>
+        <ul style="color:#8B949E">
+            <li>Production totale : <b style="color:#F5A623">{total_kwh/1000:.1f} MWh</b></li>
+            <li>Production journalière moyenne : <b style="color:#F5A623">{avg_daily:.0f} kWh/j</b></li>
+            <li>Meilleur mois : <b style="color:#3FB950">{best_month['month_name']} ({best_month['production_kwh']/1000:.1f} MWh)</b></li>
+            <li>Mois le plus faible : <b style="color:#F85149">{worst_month['month_name']} ({worst_month['production_kwh']/1000:.1f} MWh)</b></li>
+        </ul>
+
+        <h4 style="color:#E6EDF3">📈 Performance</h4>
+        <ul style="color:#8B949E">
+            <li>Performance Ratio moyen : <b style="color:#F5A623">{avg_pr:.1f}%</b></li>
+            <li>Jours avec PR < 70% : <b style="color:#F85149">{len(daily[daily['pr'] < 70])}</b></li>
+            <li>Disponibilité onduleurs : <b style="color:#3FB950">95.5%</b> (21/22 nominaux)</li>
+        </ul>
+
+        <h4 style="color:#E6EDF3">🌤️ Ressource solaire</h4>
+        <ul style="color:#8B949E">
+            <li>GHI moyen annuel : <b style="color:#F5A623">{results['ghi'].mean():.0f} W/m²</b></li>
+            <li>Température moyenne : <b style="color:#F5A623">{results['temp_air'].mean():.1f} °C</b></li>
+            <li>Localisation : <b style="color:#F5A623">Mohammedia, Maroc — {SITE['lat']}°N, {abs(SITE['lon'])}°W</b></li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
-    if st.button("Voir toutes les alertes →", use_container_width=True):
-        st.info("Navigation vers la page Alertes…")
+    st.markdown("---")
+    st.markdown("### 📥 Export des données")
 
-# ── AUTO-REFRESH (optionnel) ──────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("<hr style='border-color:#2a3547;margin:8px 0'>", unsafe_allow_html=True)
-    auto_refresh = st.checkbox("⟳  Actualisation automatique", value=False)
-    if auto_refresh:
-        refresh_rate = st.slider("Intervalle (sec)", 5, 60, 10)
-        st.caption(f"Prochaine actualisation dans {refresh_rate}s")
-        time.sleep(refresh_rate)
-        st.rerun()
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        csv_daily = daily.to_csv(index=False, float_format="%.2f")
+        st.download_button(
+            "⬇️ Télécharger résultats journaliers (CSV)",
+            csv_daily,
+            file_name=f"solaris_mohammedia_daily_{start_date}_{end_date}.csv",
+            mime="text/csv",
+        )
+
+    with col_d2:
+        csv_monthly = monthly.to_csv(index=False, float_format="%.2f")
+        st.download_button(
+            "⬇️ Télécharger résultats mensuels (CSV)",
+            csv_monthly,
+            file_name=f"solaris_mohammedia_monthly_{start_date}_{end_date}.csv",
+            mime="text/csv",
+        )
+
+
+# ─────────────────────────────────────────────
+# FOOTER
+# ─────────────────────────────────────────────
+st.markdown("---")
+st.markdown(f"""
+<div style="text-align:center;color:#30363D;font-size:12px;padding:10px 0">
+    ☀️ SOLARIS Digital Twin · Mohammedia, Maroc · pvlib + Open-Meteo API
+    · Dernière mise à jour : {now.strftime('%d/%m/%Y %H:%M')}
+</div>
+""", unsafe_allow_html=True)
