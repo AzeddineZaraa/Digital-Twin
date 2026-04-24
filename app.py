@@ -656,9 +656,14 @@ if menu == "Vue Globale":
         c1.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C")
         c2.metric("Irradiance", f"{ghi_now} W/m2")
         c3.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
-    with col_perf:
+   with col_perf:
         st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
-        st.metric("Puissance actuelle", f"{results['ac_power_kw'].iloc[-1]:.2f} kW")
+        current_hour = datetime.now().hour
+        today_str = datetime.now().date()
+        mask = (results["date"] == today_str) & (results["hour"] == current_hour)
+        current_power = results.loc[mask, "ac_power_kw"].values
+        current_power_val = current_power[0] if len(current_power) > 0 else 0.0
+        st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
         st.metric("Production du jour", f"{daily['production_kwh'].iloc[-1]:.2f} kWh")
         st.metric("Production totale", f"{daily['production_kwh'].sum()/1000:.2f} MWh")
         st.metric("PR", f"{daily['pr'].mean():.1f} %")
