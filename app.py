@@ -574,7 +574,7 @@ with st.sidebar:
     st.markdown("**Periode d'analyse**")
     col_s, col_e = st.columns(2)
     with col_s:
-        start_date = st.date_input("Debut", value=datetime(2024, 4, 1), label_visibility="collapsed")
+        start_date = st.date_input("Debut", value=datetime(2025, 4, 1), label_visibility="collapsed")
     with col_e:
         end_date = st.date_input("Fin", value=datetime(2026, 4, 24), label_visibility="collapsed")
 
