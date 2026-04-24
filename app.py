@@ -664,7 +664,9 @@ if menu == "Vue Globale":
         current_power = results.loc[mask, "ac_power_kw"].values
         current_power_val = current_power[0] if len(current_power) > 0 else 0.0
         st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
-        st.metric("Production du jour", f"{daily['production_kwh'].iloc[-1]:.2f} kWh")
+        today_daily = daily[daily["date"] == pd.Timestamp(today_str)]
+        today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
+        st.metric("Production du jour", f"{today_kwh:.2f} kWh")
         st.metric("Production totale", f"{daily['production_kwh'].sum()/1000:.2f} MWh")
         st.metric("PR", f"{daily['pr'].mean():.1f} %")
     st.markdown("---")
