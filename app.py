@@ -574,7 +574,7 @@ with st.sidebar:
     st.markdown("**Periode d'analyse**")
     col_s, col_e = st.columns(2)
     with col_s:
-        start_date = st.date_input("Debut", value=datetime(2025, 4, 1), label_visibility="collapsed")
+        start_date = st.date_input("Debut", value=datetime(2026, 4, 1), label_visibility="collapsed")
     with col_e:
         end_date = st.date_input("Fin", value=datetime(2026, 4, 24), label_visibility="collapsed")
 
@@ -897,7 +897,6 @@ elif menu == "Onduleurs":
     n = SITE["num_inverters"]
     np.random.seed(42)
     inv_power = np.random.normal(95, 8, n).clip(60, 105)
-    inv_power[6] = 78
     inv_status = ["ALERTE" if p < 85 else "OK" for p in inv_power]
     inv_labels = [f"INV-{i+1:02d}" for i in range(n)]
 
