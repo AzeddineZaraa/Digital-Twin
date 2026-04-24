@@ -645,11 +645,10 @@ st.markdown(f"""
 # VUE GLOBALE
 # ─────────────────────────────────────────────
 if menu == "Vue Globale":
-
     col_img, col_perf = st.columns([2, 1])
     with col_img:
-       st.image(
-            "assets/Scene_enset.png",  # .png au lieu de .jpg
+        st.image(
+            "assets/Scene_enset.png",
             use_container_width=True,
         )
         c1, c2, c3 = st.columns(3)
