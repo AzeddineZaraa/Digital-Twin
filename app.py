@@ -367,20 +367,29 @@ SITE = {
     "lon": -7.361500,
     "altitude": 56,
     "timezone": "Africa/Casablanca",
-    "capacity_kwp": 3.95,      # au lieu de 500
-    "surface_m2": 23.27,       # 12 × 1.939
-    "num_panels": 12,          # au lieu de 1250
-    "num_inverters": 1,        # au lieu de 22
+    "capacity_kwp": 3.95,
+    "surface_m2": 23.27,
+    "num_panels": 12,
+    "num_inverters": 1,
+    "commissioning_date": "2024",
+    "operator": "ENSET",
+    "grid_connection": "BT 220 V",
 }
-
 PANEL = {
     "manufacturer": "Cell Amrecan",
     "model": "OS-P72-330W",
-    "pdc0": 330,               # au lieu de 400
-    "gamma_pdc": -0.0040,      # au lieu de -0.0035
-    "tilt": 31,                # au lieu de 30
+    "technology": "Polycristallin",   # ligne manquante — cause du KeyError
+    "pdc0": 330,
+    "voc": 45.6,
+    "isc": 9.45,
+    "vmp": 37.2,
+    "imp": 8.88,
+    "efficiency_pct": 17.0,
+    "gamma_pdc": -0.0040,
+    "tilt": 31,
     "azimuth": 180,
-    "efficiency_pct": 17.0,    # au lieu de 20.7
+    "warranty_years": 25,
+    "degradation_pct_yr": 0.40,
 }
 
 INVERTER = {
@@ -395,12 +404,11 @@ INVERTER = {
 
 STRUCTURE = {
     "type": "Fixe inclinee",
-    "material": "Aluminium anodise",
+    "material": "A definir",
     "wind_load_ms": 40,
-    "snow_load_kgm2": 0,
-    "foundation": "Vis de sol (ground screw)",
-    "rows": 50,
-    "panels_per_row": 25,
+    "foundation": "Toiture / Sol",
+    "rows": 2,          # 2 rangees de 6
+    "panels_per_row": 6,
 }
 
 
@@ -566,9 +574,9 @@ with st.sidebar:
     st.markdown("**Periode d'analyse**")
     col_s, col_e = st.columns(2)
     with col_s:
-        start_date = st.date_input("Debut", value=datetime(2024, 1, 1), label_visibility="collapsed")
+        start_date = st.date_input("Debut", value=datetime(2026, 4, 1), label_visibility="collapsed")
     with col_e:
-        end_date = st.date_input("Fin", value=datetime(2024, 12, 31), label_visibility="collapsed")
+        end_date = st.date_input("Fin", value=datetime(2026, 4, 24), label_visibility="collapsed")
 
     st.markdown(f"Du **{start_date.strftime('%d/%m/%Y')}** au **{end_date.strftime('%d/%m/%Y')}**")
 
