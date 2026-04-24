@@ -656,7 +656,7 @@ if menu == "Vue Globale":
         c1.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C")
         c2.metric("Irradiance", f"{ghi_now} W/m2")
         c3.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
-   with col_perf:
+    with col_perf:
         st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
         current_hour = datetime.now().hour
         today_str = datetime.now().date()
