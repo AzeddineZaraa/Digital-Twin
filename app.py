@@ -645,6 +645,26 @@ st.markdown(f"""
 # VUE GLOBALE
 # ─────────────────────────────────────────────
 if menu == "Vue Globale":
+    col_img, col_perf = st.columns([2, 1])
+
+with col_img:
+    st.image(
+        "assets/Scene_enset.jpg",
+        use_container_width=True,
+    )
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C")
+    c2.metric("Irradiance", f"{ghi_now} W/m2")
+    c3.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
+
+with col_perf:
+    st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
+    st.metric("Puissance actuelle", f"{results['ac_power_kw'].iloc[-1]:.2f} kW")
+    st.metric("Production du jour", f"{daily['production_kwh'].iloc[-1]:.2f} kWh")
+    st.metric("Production totale", f"{daily['production_kwh'].sum()/1000:.2f} MWh")
+    st.metric("PR", f"{daily['pr'].mean():.1f} %")
+
+st.markdown("---")
     total_kwh = daily["production_kwh"].sum()
     avg_pr = daily["pr"].mean()
     peak_day_kwh = daily["production_kwh"].max()
