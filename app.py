@@ -1015,8 +1015,7 @@ elif menu == "Installation":
                 <tr><td>Fuseau horaire</td><td>Africa/Casablanca (UTC+1)</td></tr>
                 <tr><td>Mise en service</td><td>01/04/2023</td></tr>
                 <tr><td>Operateur</td><td>SOLARIS Digital Twin</td></tr>
-                <tr><td>Raccordement reseau</td><td>HTB 60 kV</td></tr>
-                <tr><td>Transformateur</td><td>630 kVA</td></tr>
+                <tr><td>Raccordement reseau</td><td>BT 220 V</td></tr>
             </table>
         </div>
         """, unsafe_allow_html=True)
