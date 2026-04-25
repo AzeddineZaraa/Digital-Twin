@@ -601,6 +601,7 @@ def fetch_meteo(lat, lon, start_date, end_date):
 
 
 @st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600)
 def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamma_pdc, start_date, end_date):
     """Enhanced pvlib simulation with comprehensive energy modeling"""
     location = Location(
@@ -613,6 +614,9 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
 
     times = df.index
     solar_pos = location.get_solarposition(times)
+    
+    # Calculate extraterrestrial radiation (required for some models)
+    dni_extra = irradiance.get_extra_radiation(times)
 
     # Enhanced irradiance transposition with multiple models
     poa_isotropic = irradiance.get_total_irradiance(
@@ -628,6 +632,7 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
         dni=df["dni"], ghi=df["ghi"], dhi=df["dhi"],
         solar_zenith=solar_pos["apparent_zenith"],
         solar_azimuth=solar_pos["azimuth"],
+        dni_extra=dni_extra,  # Required for haydavies model
         model="haydavies"
     )
 
@@ -645,14 +650,12 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
         pdc0=pdc0, gamma_pdc=gamma_pdc,
     )
     
-    dc_power_haydavies = pvsystem.pvwatts_dc(
-        g_poa_effective=poa_haydavies["poa_global"], temp_cell=cell_temp,
-        pdc0=pdc0, gamma_pdc=gamma_pdc,
-    )
+    # Use isotropic model for DC power (more standard)
+    dc_power = dc_power_isotropic
 
     # AC power with inverter efficiency modeling
     inverter_efficiency = 0.97
-    ac_power = dc_power_isotropic * inverter_efficiency
+    ac_power = dc_power * inverter_efficiency
 
     # Calculate energy losses
     soiling_loss = 0.02  # 2% soiling losses
@@ -673,11 +676,12 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
         "wind_speed": df["wind_speed"],
         "humidity": df["humidity"],
         "cloud_cover": df["cloud_cover"],
-        "dc_power_w": dc_power_isotropic,
+        "dc_power_w": dc_power,
         "ac_power_w": ac_power.clip(lower=0),
         "net_ac_power_w": net_ac_power.clip(lower=0),
         "solar_elevation": solar_pos["elevation"],
         "solar_azimuth": solar_pos["azimuth"],
+        "dni_extra": dni_extra,  # Store for reference
     })
     
     results["ac_power_kw"] = results["ac_power_w"] / 1000
