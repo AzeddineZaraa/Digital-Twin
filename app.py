@@ -947,6 +947,8 @@ if menu == "Vue Globale":
     gross_kwh = daily["gross_production_kwh"].sum()
     losses_kwh = gross_kwh - total_kwh
     avg_daily_losses = losses_kwh / len(daily) if len(daily) > 0 else 0
+    
+    avg_pr = daily["pr"].mean()
     avg_cf = daily["capacity_factor"].mean()
     co2_avoided = estimate_co2_avoidance(total_kwh)
     financial_savings = calculate_financial_metrics(total_kwh)
