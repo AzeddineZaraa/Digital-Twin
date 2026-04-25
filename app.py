@@ -656,13 +656,9 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
     # AC power with inverter efficiency modeling
     inverter_efficiency = 0.97
     ac_power = dc_power * inverter_efficiency
-
-    # Calculate energy losses
-    soiling_loss = 0.02  # 2% soiling losses
-    mismatch_loss = 0.01  # 1% mismatch
-    wiring_loss = 0.02   # 2% wiring losses
-    
-    net_ac_power = ac_power * (1 - soiling_loss - mismatch_loss - wiring_loss)
+        # Calculate system losses (total ~14% incluant l'onduleur deja a 97%)
+    additional_losses = 0.10  # 10% pertes supplementaires (salissure, mismatch, cablage, temperature)
+    net_ac_power = ac_power * (1 - additional_losses)
 
     results = pd.DataFrame({
         "datetime": times,
