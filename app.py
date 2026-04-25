@@ -577,7 +577,7 @@ with st.sidebar:
     with col_s:
         start_date = st.date_input("Debut", value=datetime(2026, 4, 1), label_visibility="collapsed")
     with col_e:
-        end_date = st.date_input("Fin", value=datetime(2026, 4, 24), label_visibility="collapsed")
+        end_date = st.date_input("Fin", value=datetime(2026, 4, 25), label_visibility="collapsed")
 
     st.markdown(f"Du **{start_date.strftime('%d/%m/%Y')}** au **{end_date.strftime('%d/%m/%Y')}**")
 
