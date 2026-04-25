@@ -946,7 +946,7 @@ if menu == "Vue Globale":
     total_kwh = daily["production_kwh"].sum()
     gross_kwh = daily["gross_production_kwh"].sum()
     losses_kwh = gross_kwh - total_kwh
-    avg_pr = daily["pr"].mean()
+    avg_daily_losses = losses_kwh / len(daily) if len(daily) > 0 else 0
     avg_cf = daily["capacity_factor"].mean()
     co2_avoided = estimate_co2_avoidance(total_kwh)
     financial_savings = calculate_financial_metrics(total_kwh)
@@ -1030,7 +1030,7 @@ if menu == "Vue Globale":
         today_daily = daily[daily["date"] == daily["date"].max()]
         today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
         st.metric("Production du jour", f"{today_kwh:.2f} kWh")
-        st.metric("Pertes totales", f"{losses_kwh:.0f} kWh", 
+        st.metric("Pertes journalieres moy.", f"{avg_daily_losses:.1f} kWh", 
                  delta=f"{(losses_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%")
         
         # Efficiency metrics
