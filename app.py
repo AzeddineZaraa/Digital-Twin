@@ -698,6 +698,9 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
 
 def compute_daily(results, num_panels):
     """Enhanced daily aggregation with comprehensive metrics"""
+    # La puissance est déjà multipliée par le nombre de panneaux dans results
+    total_capacity_kw = SITE["capacity_kwp"]  # 3.95 kWp
+    
     daily = results.groupby("date").agg(
         production_kwh=("net_ac_power_kw", lambda x: x.sum()),
         gross_production_kwh=("ac_power_kw", lambda x: x.sum()),
@@ -714,10 +717,12 @@ def compute_daily(results, num_panels):
         theoretical_psh=("ghi", lambda x: x.sum() / 1000),
     ).reset_index()
     
-    daily["theoretical_kwh"] = daily["peak_sun_hours"] * (num_panels * 0.4)
+    # Production theorique = PSH * capacite installee
+    daily["theoretical_kwh"] = daily["peak_sun_hours"] * total_capacity_kw
     daily["pr"] = (daily["production_kwh"] / daily["theoretical_kwh"].replace(0, np.nan)).clip(0, 1) * 100
-    daily["capacity_factor"] = (daily["production_kwh"] / (24 * num_panels * 0.4)) * 100
-    daily["energy_yield"] = daily["production_kwh"] / (num_panels * PANEL["pdc0"] / 1000)
+    daily["capacity_factor"] = (daily["production_kwh"] / (24 * total_capacity_kw)) * 100
+    daily["energy_yield"] = daily["production_kwh"] / total_capacity_kw
+    
     daily["date"] = pd.to_datetime(daily["date"])
     daily["day_of_week"] = daily["date"].dt.day_name()
     daily["is_weekend"] = daily["date"].dt.dayofweek.isin([5, 6])
