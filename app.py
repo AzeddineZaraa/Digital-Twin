@@ -1249,7 +1249,7 @@ elif menu == "Production":
         
         with corr_cols[2]:
             fig_corr3 = px.scatter(
-                daily, x="avg_wind", y="cell_temp" if "cell_temp" not in daily.columns else "production_kwh",
+                daily, x="avg_wind", y="production_kwh",
                 color="pr", color_continuous_scale="YlOrRd",
                 opacity=0.7,
                 labels={"avg_wind": "Vent (m/s)", "production_kwh": "Production (kWh)"},
