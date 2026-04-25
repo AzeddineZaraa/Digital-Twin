@@ -1524,16 +1524,16 @@ elif menu == "Meteo & Irradiance":
             st.plotly_chart(fig_cell, use_container_width=True)
     
         with irr_tabs[2]:
-        st.markdown('<div class="section-title">Ressource solaire mensuelle</div>', unsafe_allow_html=True)
-        
-        months_fr = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"]
-        
-        monthly_solar = results.groupby("month").agg(
-            ghi_total=("ghi", lambda x: x.sum() / 1000),
-            dni_total=("dni", lambda x: x.sum() / 1000),
-            dhi_total=("dhi", lambda x: x.sum() / 1000),
-        ).reset_index()
-        monthly_solar["month_name"] = [months_fr[m - 1] for m in monthly_solar["month"]]
+            st.markdown('<div class="section-title">Ressource solaire mensuelle</div>', unsafe_allow_html=True)
+            
+            months_fr = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"]
+            
+            monthly_solar = results.groupby("month").agg(
+                ghi_total=("ghi", lambda x: x.sum() / 1000),
+                dni_total=("dni", lambda x: x.sum() / 1000),
+                dhi_total=("dhi", lambda x: x.sum() / 1000),
+            ).reset_index()
+            monthly_solar["month_name"] = [months_fr[m - 1] for m in monthly_solar["month"]]
         
         fig_solar = go.Figure()
         fig_solar.add_trace(go.Bar(
