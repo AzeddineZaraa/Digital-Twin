@@ -880,7 +880,7 @@ with st.spinner("Simulation pvlib en cours..."):
     results = run_pvlib_simulation(
         lat=SITE["lat"], lon=SITE["lon"], altitude=SITE["altitude"],
         timezone=SITE["timezone"], tilt=PANEL["tilt"], azimuth=PANEL["azimuth"],
-        pdc0=PANEL["pdc0"], gamma_pdc=PANEL["gamma_pdc"],
+        pdc0=PANEL["pdc0"] * SITE["num_panels"], gamma_pdc=PANEL["gamma_pdc"],
         start_date=str(start_date), end_date=str(end_date),
     )
 
@@ -889,8 +889,6 @@ if results is None:
     st.stop()
 
 # Scale for number of panels
-results["ac_power_kw"] = results["ac_power_kw"] * SITE["num_panels"]
-results["net_ac_power_kw"] = results["net_ac_power_kw"] * SITE["num_panels"]
 daily = compute_daily(results, SITE["num_panels"])
 monthly = compute_monthly(daily)
 current_meteo = get_current_meteo(SITE["lat"], SITE["lon"])
