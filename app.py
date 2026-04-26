@@ -18,7 +18,7 @@ from pvlib.location import Location
 from pvlib import irradiance, temperature, pvsystem
 import warnings
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 warnings.filterwarnings('ignore')
 
 # ─────────────────────────────────────────────
@@ -857,13 +857,27 @@ with st.sidebar:
     
     # Enhanced period selection
     st.markdown("**Periode d'analyse**")
-    
-    col_s, col_e = st.columns(2)
-    with col_s:
-        start_date = st.date_input("Debut", value=datetime(2026, 4, 1), label_visibility="collapsed")
-    with col_e:
-        end_date = st.date_input("Fin", value=datetime(2026, 4, 26), label_visibility="collapsed")
 
+    col_s, col_e = st.columns(2)
+
+    with col_s:
+        start_date = st.date_input(
+            "Debut",
+            value=datetime(2026, 4, 1),
+            label_visibility="collapsed"
+        )
+    
+    with col_e:
+        today = datetime.today().date()
+    
+        if "end_date" not in st.session_state or st.session_state.end_date != today:
+            st.session_state.end_date = today   # ← bien indenté ici
+    
+        end_date = st.date_input(
+            "Fin",
+            key="end_date",
+            label_visibility="collapsed"
+        )
     # Quick date presets
     preset_cols = st.columns(3)
     with preset_cols[0]:
