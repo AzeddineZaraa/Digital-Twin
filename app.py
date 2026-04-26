@@ -1052,29 +1052,29 @@ if menu == "Vue Globale":
     
     st.markdown("---")
     
-    # Current conditions and system image
-        col_img, col_perf = st.columns([5, 1])
-        
-        with col_img:
-            st.image(
-                "assets/Scene_enset.png",
-                use_container_width=True,
-            )
-        
-        # Weather metrics
-        weather_cols = st.columns(4)
-        with weather_cols[0]:
-            st.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C",
-                     delta=f"Ressentie: {current_meteo.get('apparent_temperature', '--')} C")
-        with weather_cols[1]:
-            st.metric("Irradiance", f"{ghi_now:.0f} W/m²")
-        with weather_cols[2]:
-            st.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
-        with weather_cols[3]:
-            st.metric("Humidite", f"{current_meteo.get('relative_humidity_2m', '--')} %")
-    
-    with col_perf:
-        st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
+   # Current conditions and system image
+col_img, col_perf = st.columns([5, 1])
+
+with col_img:
+    st.image(
+        "assets/Scene_enset.png",
+        use_container_width=True,
+    )
+
+    # Weather metrics
+    weather_cols = st.columns(4)
+    with weather_cols[0]:
+        st.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C",
+                 delta=f"Ressentie: {current_meteo.get('apparent_temperature', '--')} C")
+    with weather_cols[1]:
+        st.metric("Irradiance", f"{ghi_now:.0f} W/m²")
+    with weather_cols[2]:
+        st.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
+    with weather_cols[3]:
+        st.metric("Humidite", f"{current_meteo.get('relative_humidity_2m', '--')} %")
+
+with col_perf:
+    st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
         
         current_hour = datetime.now().hour
         today_str = datetime.now().date()
