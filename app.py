@@ -1053,182 +1053,182 @@ if menu == "Vue Globale":
     st.markdown("---")
     
    # Current conditions and system image
-col_img, col_perf = st.columns([5, 1])
-
-with col_img:
-    st.image(
-        "assets/Scene_enset.png",
-        use_container_width=True,
-    )
-
-    # Weather metrics
-    weather_cols = st.columns(4)
-    with weather_cols[0]:
-        st.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C",
-                 delta=f"Ressentie: {current_meteo.get('apparent_temperature', '--')} C")
-    with weather_cols[1]:
-        st.metric("Irradiance", f"{ghi_now:.0f} W/m²")
-    with weather_cols[2]:
-        st.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
-    with weather_cols[3]:
-        st.metric("Humidite", f"{current_meteo.get('relative_humidity_2m', '--')} %")
-
-with col_perf:
-    st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
-
-    current_hour = datetime.now().hour
-    today_str = datetime.now().date()
-
-    mask = (results["date"] == today_str) & (results["hour"] == current_hour)
-    current_power = results.loc[mask, "net_ac_power_kw"].values
-    current_power_val = current_power[0] if len(current_power) > 0 else 0.0
-
-    st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
-
-    today_daily = daily[daily["date"] == daily["date"].max()]
-    today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
-
-    st.metric("Production du jour", f"{today_kwh:.2f} kWh")
-
-    st.metric(
-        "Pertes journalieres moy.",
-        f"{avg_daily_losses:.1f} kWh",
-        delta=f"{(losses_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
-    )
-
-    st.metric(
-        "Rendement energetique",
-        f"{(total_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
-    )
+    col_img, col_perf = st.columns([5, 1])
     
-    st.markdown("---")
-
-    # Enhanced daily production chart with anomaly detection
-    col_left, col_right = st.columns([2, 1])
-
-    with col_left:
-        st.markdown('<div class="section-title">Production journaliere (kWh)</div>', unsafe_allow_html=True)
-        
-        # Anomaly detection
-        daily_prod_mean = daily["production_kwh"].mean()
-        daily_prod_std = daily["production_kwh"].std()
-        anomalies = daily[
-            (daily["production_kwh"] > daily_prod_mean + 2 * daily_prod_std) | 
-            (daily["production_kwh"] < daily_prod_mean - 2 * daily_prod_std)
-            ]
-        
-        fig_daily = go.Figure()
-        
-        fig_daily.add_trace(go.Bar(
-            x=daily["date"], y=daily["production_kwh"],
-            name="Production",
-            marker_color="#F5A623", opacity=0.85,
-            hovertemplate="Date: %{x}<br>Production: %{y:.1f} kWh<extra></extra>"
-        ))
-        
-        fig_daily.add_trace(go.Scatter(
-            x=daily["date"],
-            y=daily["production_kwh"].rolling(7, center=True).mean(),
-            name="Moy. mobile 7j",
-            line=dict(color="#3498DB", width=2),
-        ))
-        
-        # Highlight anomalies
-        if len(anomalies) > 0:
-            fig_daily.add_trace(go.Scatter(
-                x=anomalies["date"], y=anomalies["production_kwh"],
-                mode="markers", name="Anomalies",
-                marker=dict(color="#E74C3C", size=10, symbol="x"),
-            ))
-        
-        layout = dict(**PLOT_LAYOUT)
-        layout["height"] = 320
-        layout["showlegend"] = True
-        layout["yaxis"] = dict(gridcolor="#1E232D", title="kWh", zeroline=False)
-        fig_daily.update_layout(**layout)
-        st.plotly_chart(fig_daily, use_container_width=True)
-
-    with col_right:
-        # Production distribution by day of week
-        st.markdown('<div class="section-title">Production par jour</div>', unsafe_allow_html=True)
-        
-        daily_weekday = daily.groupby("day_of_week")["production_kwh"].mean().reset_index()
-        daily_weekday["day_of_week"] = pd.Categorical(
-            daily_weekday["day_of_week"],
-            categories=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-            ordered=True
+    with col_img:
+        st.image(
+            "assets/Scene_enset.png",
+            use_container_width=True,
         )
-        daily_weekday = daily_weekday.sort_values("day_of_week")
-        
-        fig_weekday = go.Figure(go.Bar(
-            x=daily_weekday["day_of_week"],
-            y=daily_weekday["production_kwh"],
-            marker_color="#9B59B6",
-            text=daily_weekday["production_kwh"].round(0).astype(str) + " kWh",
-            textposition="outside",
-            textfont=dict(color="#E8EDF5", size=9, family="Space Mono"),
-        ))
-        layout2 = dict(**PLOT_LAYOUT)
-        layout2["height"] = 320
-        fig_weekday.update_layout(**layout2)
-        st.plotly_chart(fig_weekday, use_container_width=True)
-
-    st.markdown("---")
     
-    # Enhanced alerts with categorization
-    st.markdown('<div class="section-title">Centre d\'alertes</div>', unsafe_allow_html=True)
+        # Weather metrics
+        weather_cols = st.columns(4)
+        with weather_cols[0]:
+            st.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C",
+                     delta=f"Ressentie: {current_meteo.get('apparent_temperature', '--')} C")
+        with weather_cols[1]:
+            st.metric("Irradiance", f"{ghi_now:.0f} W/m²")
+        with weather_cols[2]:
+            st.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
+        with weather_cols[3]:
+            st.metric("Humidite", f"{current_meteo.get('relative_humidity_2m', '--')} %")
     
-    alerts_col1, alerts_col2 = st.columns([2, 1])
-
-    with alerts_col1:
-        low_pr_days = daily[daily["pr"] < 70]
-        high_temp_days = daily[daily["avg_temp"] > 35]
-        low_prod_days = daily[daily["production_kwh"] < daily["production_kwh"].quantile(0.1)]
+    with col_perf:
+        st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
+    
+        current_hour = datetime.now().hour
+        today_str = datetime.now().date()
+    
+        mask = (results["date"] == today_str) & (results["hour"] == current_hour)
+        current_power = results.loc[mask, "net_ac_power_kw"].values
+        current_power_val = current_power[0] if len(current_power) > 0 else 0.0
+    
+        st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
+    
+        today_daily = daily[daily["date"] == daily["date"].max()]
+        today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
+    
+        st.metric("Production du jour", f"{today_kwh:.2f} kWh")
+    
+        st.metric(
+            "Pertes journalieres moy.",
+            f"{avg_daily_losses:.1f} kWh",
+            delta=f"{(losses_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
+        )
+    
+        st.metric(
+            "Rendement energetique",
+            f"{(total_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
+        )
         
-        if len(low_pr_days) > 0:
-            st.markdown(f"""
-            <div class="alert-card alert-warning">
-                <b>Performance degradee</b><br>
-                {len(low_pr_days)} jours avec PR < 70% — 
-                Dernier : {low_pr_days["date"].max().strftime('%d/%m/%Y')}
-            </div>""", unsafe_allow_html=True)
+        st.markdown("---")
+    
+        # Enhanced daily production chart with anomaly detection
+        col_left, col_right = st.columns([2, 1])
+    
+        with col_left:
+            st.markdown('<div class="section-title">Production journaliere (kWh)</div>', unsafe_allow_html=True)
+            
+            # Anomaly detection
+            daily_prod_mean = daily["production_kwh"].mean()
+            daily_prod_std = daily["production_kwh"].std()
+            anomalies = daily[
+                (daily["production_kwh"] > daily_prod_mean + 2 * daily_prod_std) | 
+                (daily["production_kwh"] < daily_prod_mean - 2 * daily_prod_std)
+                ]
+            
+            fig_daily = go.Figure()
+            
+            fig_daily.add_trace(go.Bar(
+                x=daily["date"], y=daily["production_kwh"],
+                name="Production",
+                marker_color="#F5A623", opacity=0.85,
+                hovertemplate="Date: %{x}<br>Production: %{y:.1f} kWh<extra></extra>"
+            ))
+            
+            fig_daily.add_trace(go.Scatter(
+                x=daily["date"],
+                y=daily["production_kwh"].rolling(7, center=True).mean(),
+                name="Moy. mobile 7j",
+                line=dict(color="#3498DB", width=2),
+            ))
+            
+            # Highlight anomalies
+            if len(anomalies) > 0:
+                fig_daily.add_trace(go.Scatter(
+                    x=anomalies["date"], y=anomalies["production_kwh"],
+                    mode="markers", name="Anomalies",
+                    marker=dict(color="#E74C3C", size=10, symbol="x"),
+                ))
+            
+            layout = dict(**PLOT_LAYOUT)
+            layout["height"] = 320
+            layout["showlegend"] = True
+            layout["yaxis"] = dict(gridcolor="#1E232D", title="kWh", zeroline=False)
+            fig_daily.update_layout(**layout)
+            st.plotly_chart(fig_daily, use_container_width=True)
+    
+        with col_right:
+            # Production distribution by day of week
+            st.markdown('<div class="section-title">Production par jour</div>', unsafe_allow_html=True)
+            
+            daily_weekday = daily.groupby("day_of_week")["production_kwh"].mean().reset_index()
+            daily_weekday["day_of_week"] = pd.Categorical(
+                daily_weekday["day_of_week"],
+                categories=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                ordered=True
+            )
+            daily_weekday = daily_weekday.sort_values("day_of_week")
+            
+            fig_weekday = go.Figure(go.Bar(
+                x=daily_weekday["day_of_week"],
+                y=daily_weekday["production_kwh"],
+                marker_color="#9B59B6",
+                text=daily_weekday["production_kwh"].round(0).astype(str) + " kWh",
+                textposition="outside",
+                textfont=dict(color="#E8EDF5", size=9, family="Space Mono"),
+            ))
+            layout2 = dict(**PLOT_LAYOUT)
+            layout2["height"] = 320
+            fig_weekday.update_layout(**layout2)
+            st.plotly_chart(fig_weekday, use_container_width=True)
+    
+        st.markdown("---")
         
-        if len(high_temp_days) > 0:
-            st.markdown(f"""
-            <div class="alert-card alert-warning">
-                <b>Temperature elevee</b><br>
-                {len(high_temp_days)} jours > 35 C — Perte de rendement estimee
-            </div>""", unsafe_allow_html=True)
+        # Enhanced alerts with categorization
+        st.markdown('<div class="section-title">Centre d\'alertes</div>', unsafe_allow_html=True)
         
-        if len(low_prod_days) > 0:
-            st.markdown(f"""
-            <div class="alert-card alert-info">
-                <b>Production faible</b><br>
-                {len(low_prod_days)} jours dans le decile inferieur
-            </div>""", unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="alert-card alert-ok">
-            <b>Systeme de monitoring</b> — Toutes les donnees recues, pas d'erreurs de communication
-        </div>
-        <div class="alert-card alert-ok">
-            <b>Raccordement reseau</b> — Tension et frequence nominales
-        </div>
-        """, unsafe_allow_html=True)
-
-    with alerts_col2:
-        # System health score
-        health_score = 100 - (len(low_pr_days) * 5 + len(high_temp_days) * 2 + len(low_prod_days) * 3)
-        health_score = max(min(health_score, 100), 0)
-        
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-value" style="color: {'#2ECC71' if health_score > 80 else '#F5A623' if health_score > 60 else '#E74C3C'}">
-                {health_score:.0f}/100
+        alerts_col1, alerts_col2 = st.columns([2, 1])
+    
+        with alerts_col1:
+            low_pr_days = daily[daily["pr"] < 70]
+            high_temp_days = daily[daily["avg_temp"] > 35]
+            low_prod_days = daily[daily["production_kwh"] < daily["production_kwh"].quantile(0.1)]
+            
+            if len(low_pr_days) > 0:
+                st.markdown(f"""
+                <div class="alert-card alert-warning">
+                    <b>Performance degradee</b><br>
+                    {len(low_pr_days)} jours avec PR < 70% — 
+                    Dernier : {low_pr_days["date"].max().strftime('%d/%m/%Y')}
+                </div>""", unsafe_allow_html=True)
+            
+            if len(high_temp_days) > 0:
+                st.markdown(f"""
+                <div class="alert-card alert-warning">
+                    <b>Temperature elevee</b><br>
+                    {len(high_temp_days)} jours > 35 C — Perte de rendement estimee
+                </div>""", unsafe_allow_html=True)
+            
+            if len(low_prod_days) > 0:
+                st.markdown(f"""
+                <div class="alert-card alert-info">
+                    <b>Production faible</b><br>
+                    {len(low_prod_days)} jours dans le decile inferieur
+                </div>""", unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div class="alert-card alert-ok">
+                <b>Systeme de monitoring</b> — Toutes les donnees recues, pas d'erreurs de communication
             </div>
-            <div class="kpi-label">Score de<br>Sante Systeme</div>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="alert-card alert-ok">
+                <b>Raccordement reseau</b> — Tension et frequence nominales
+            </div>
+            """, unsafe_allow_html=True)
+    
+        with alerts_col2:
+            # System health score
+            health_score = 100 - (len(low_pr_days) * 5 + len(high_temp_days) * 2 + len(low_prod_days) * 3)
+            health_score = max(min(health_score, 100), 0)
+            
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-value" style="color: {'#2ECC71' if health_score > 80 else '#F5A623' if health_score > 60 else '#E74C3C'}">
+                    {health_score:.0f}/100
+                </div>
+                <div class="kpi-label">Score de<br>Sante Systeme</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
@@ -1529,17 +1529,17 @@ elif menu == "Meteo & Irradiance":
     
     with irr_tabs[1]:
         col_t1, col_t2 = st.columns(2)
-        
+
         with col_t1:
             st.markdown('<div class="section-title">Temperature ambiante</div>', unsafe_allow_html=True)
-            
+
             daily_temp = results.groupby("date").agg(
                 temp_avg=("temp_air", "mean"),
                 temp_max=("temp_air", "max"),
                 temp_min=("temp_air", "min")
             ).reset_index()
             daily_temp["date"] = pd.to_datetime(daily_temp["date"])
-            
+
             fig_temp = go.Figure()
             fig_temp.add_trace(go.Scatter(
                 x=daily_temp["date"], y=daily_temp["temp_max"],
@@ -1556,18 +1556,18 @@ elif menu == "Meteo & Irradiance":
                 line=dict(color="#3498DB", width=1),
                 name="Min"
             ))
-            
+
             layout_temp = dict(**PLOT_LAYOUT)
             layout_temp["height"] = 350
             layout_temp["yaxis"] = dict(gridcolor="#1E232D", title="C", zeroline=False)
             fig_temp.update_layout(**layout_temp)
             st.plotly_chart(fig_temp, use_container_width=True)
-        
+
         with col_t2:
             st.markdown('<div class="section-title">Temperature cellule vs Ambiante</div>', unsafe_allow_html=True)
-            
+
             hourly_temp = results.groupby("hour")[["temp_air", "cell_temp"]].mean().reset_index()
-            
+
             fig_cell = go.Figure()
             fig_cell.add_trace(go.Scatter(
                 x=hourly_temp["hour"], y=hourly_temp["temp_air"],
@@ -1579,26 +1579,26 @@ elif menu == "Meteo & Irradiance":
                 line=dict(color="#E74C3C", width=2),
                 name="Cellule"
             ))
-            
+
             layout_cell = dict(**PLOT_LAYOUT)
             layout_cell["height"] = 350
             layout_cell["xaxis"] = dict(title="Heure", gridcolor="#1E232D", dtick=1)
             layout_cell["yaxis"] = dict(title="C", gridcolor="#1E232D")
             fig_cell.update_layout(**layout_cell)
             st.plotly_chart(fig_cell, use_container_width=True)
-    
-        with irr_tabs[2]:
-            st.markdown('<div class="section-title">Ressource solaire mensuelle</div>', unsafe_allow_html=True)
-            
-            months_fr = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"]
-            
-            monthly_solar = results.groupby("month").agg(
-                ghi_total=("ghi", lambda x: x.sum() / 1000),
-                dni_total=("dni", lambda x: x.sum() / 1000),
-                dhi_total=("dhi", lambda x: x.sum() / 1000),
-            ).reset_index()
-            monthly_solar["month_name"] = [months_fr[m - 1] for m in monthly_solar["month"]]
-        
+
+    with irr_tabs[2]:
+        st.markdown('<div class="section-title">Ressource solaire mensuelle</div>', unsafe_allow_html=True)
+
+        months_fr = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"]
+
+        monthly_solar = results.groupby("month").agg(
+            ghi_total=("ghi", lambda x: x.sum() / 1000),
+            dni_total=("dni", lambda x: x.sum() / 1000),
+            dhi_total=("dhi", lambda x: x.sum() / 1000),
+        ).reset_index()
+        monthly_solar["month_name"] = [months_fr[m - 1] for m in monthly_solar["month"]]
+
         fig_solar = go.Figure()
         fig_solar.add_trace(go.Bar(
             x=monthly_solar["month_name"], y=monthly_solar["ghi_total"],
@@ -1615,7 +1615,7 @@ elif menu == "Meteo & Irradiance":
             name="DHI", marker_color="#FFCF6B",
             hovertemplate="DHI: %{y:.0f} kWh/m2<extra></extra>"
         ))
-        
+
         layout_solar = dict(**PLOT_LAYOUT)
         layout_solar["height"] = 300
         layout_solar["barmode"] = "group"
