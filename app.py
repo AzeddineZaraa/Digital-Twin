@@ -1053,7 +1053,7 @@ if menu == "Vue Globale":
     st.markdown("---")
     
     # Current conditions and system image
-        col_img, col_perf = st.columns([5, 1])    
+     col_img, col_perf = st.columns([5, 1])    
         with col_img:
         st.image(
             "assets/Scene_enset.png",
