@@ -1075,22 +1075,31 @@ with col_img:
 
 with col_perf:
     st.markdown('<div class="section-title">Performance en temps reel</div>', unsafe_allow_html=True)
-        
-        current_hour = datetime.now().hour
-        today_str = datetime.now().date()
-        mask = (results["date"] == today_str) & (results["hour"] == current_hour)
-        current_power = results.loc[mask, "net_ac_power_kw"].values
-        current_power_val = current_power[0] if len(current_power) > 0 else 0.0
-        
-        st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
-        today_daily = daily[daily["date"] == daily["date"].max()]
-        today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
-        st.metric("Production du jour", f"{today_kwh:.2f} kWh")
-        st.metric("Pertes journalieres moy.", f"{avg_daily_losses:.1f} kWh", 
-                 delta=f"{(losses_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%")
-        
-        # Efficiency metrics
-        st.metric("Rendement energetique", f"{(total_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%")
+
+    current_hour = datetime.now().hour
+    today_str = datetime.now().date()
+
+    mask = (results["date"] == today_str) & (results["hour"] == current_hour)
+    current_power = results.loc[mask, "net_ac_power_kw"].values
+    current_power_val = current_power[0] if len(current_power) > 0 else 0.0
+
+    st.metric("Puissance actuelle", f"{current_power_val:.2f} kW")
+
+    today_daily = daily[daily["date"] == daily["date"].max()]
+    today_kwh = today_daily["production_kwh"].values[0] if len(today_daily) > 0 else 0.0
+
+    st.metric("Production du jour", f"{today_kwh:.2f} kWh")
+
+    st.metric(
+        "Pertes journalieres moy.",
+        f"{avg_daily_losses:.1f} kWh",
+        delta=f"{(losses_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
+    )
+
+    st.metric(
+        "Rendement energetique",
+        f"{(total_kwh/gross_kwh)*100:.1f}%" if gross_kwh > 0 else "0%"
+    )
     
     st.markdown("---")
 
