@@ -1066,7 +1066,7 @@ if menu == "Vue Globale":
             st.metric("Temperature", f"{current_meteo.get('temperature_2m', '--')} C",
                      delta=f"Ressentie: {current_meteo.get('apparent_temperature', '--')} C")
         with weather_cols[1]:
-            st.metric("Irradiance", f"{ghi_now} W/m2")
+            st.metric("Irradiance", f"{ghi_now:.0f} W/m²")
         with weather_cols[2]:
             st.metric("Vent", f"{current_meteo.get('wind_speed_10m', '--')} km/h")
         with weather_cols[3]:
