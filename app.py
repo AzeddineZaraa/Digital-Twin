@@ -1848,18 +1848,23 @@ elif menu == "Installation":
 # ─────────────────────────────────────────────
 # CONTROLE RELAIS ESP32 VIA BLYNK
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# CONTROLE RELAIS ESP32 VIA BLYNK
+# ─────────────────────────────────────────────
 elif menu == "Controle Relais":
     st.markdown("## Controle Relais ESP32 via Blynk")
     
+    # Verifier connexion device
     device_connected = blynk_get_device_status()
     
     if device_connected:
-        st.success("ESP32 connecte a Blynk")
+        st.success("ESP32 connecte a Blynk - WiFi: FAR")
     else:
-        st.error("ESP32 non connecte a Blynk")
+        st.warning("ESP32 non connecte - Verifiez WiFi FAR")
     
     st.markdown("---")
     
+    # Etat actuel du relais
     relay_state = blynk_get_pin(BLYNK_CONFIG["relay_pin"])
     
     col1, col2, col3 = st.columns(3)
@@ -1871,30 +1876,33 @@ elif menu == "Controle Relais":
             <div class="metric-value" style="color: {'#2ECC71' if relay_state == 1 else '#E74C3C'}">
                 {'ACTIF' if relay_state == 1 else 'INACTIF'}
             </div>
-            <div class="metric-unit">{BLYNK_CONFIG['relay_name']}</div>
+            <div class="metric-unit">{BLYNK_CONFIG['relay_name']} - GPIO 26</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">PIN VIRTUEL</div>
+            <div class="metric-label">PIN VIRTUEL BLYNK</div>
             <div class="metric-value">{BLYNK_CONFIG['relay_pin']}</div>
-            <div class="metric-unit">Blynk Cloud</div>
+            <div class="metric-unit">Template: Digital Twin</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">DERNIERE MAJ</div>
-            <div class="metric-value" style="font-size:18px;">{datetime.now().strftime('%H:%M:%S')}</div>
-            <div class="metric-unit">{datetime.now().strftime('%d/%m/%Y')}</div>
+            <div class="metric-label">CONNEXION WiFi</div>
+            <div class="metric-value" style="color: {'#2ECC71' if device_connected else '#E74C3C'}">
+                {'FAR' if device_connected else 'HORS LIGNE'}
+            </div>
+            <div class="metric-unit">ESP32</div>
         </div>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
+    # Boutons de controle
     st.markdown('<div class="section-title">Commandes Relais</div>', unsafe_allow_html=True)
     
     col_btn1, col_btn2, col_btn3 = st.columns(3)
@@ -1902,18 +1910,18 @@ elif menu == "Controle Relais":
     with col_btn1:
         if st.button("ACTIVER RELAIS", type="primary", use_container_width=True):
             if blynk_set_pin(BLYNK_CONFIG["relay_pin"], 1):
-                st.success("Relais active avec succes")
+                st.success("Relais active - Commande envoyee via Blynk")
                 st.rerun()
             else:
-                st.error("Erreur lors de l'activation du relais")
+                st.error("Erreur - ESP32 non joignable")
     
     with col_btn2:
         if st.button("DESACTIVER RELAIS", type="secondary", use_container_width=True):
             if blynk_set_pin(BLYNK_CONFIG["relay_pin"], 0):
-                st.success("Relais desactive avec succes")
+                st.success("Relais desactive - Commande envoyee via Blynk")
                 st.rerun()
             else:
-                st.error("Erreur lors de la desactivation du relais")
+                st.error("Erreur - ESP32 non joignable")
     
     with col_btn3:
         if st.button("ACTUALISER ETAT", use_container_width=True):
@@ -1921,7 +1929,41 @@ elif menu == "Controle Relais":
     
     st.markdown("---")
     
-    with st.expander("Code ESP32 pour Blynk", expanded=False):
+    # Informations de connexion
+    st.markdown('<div class="section-title">Informations Connexion</div>', unsafe_allow_html=True)
+    
+    info_col1, info_col2 = st.columns(2)
+    
+    with info_col1:
+        st.markdown("""
+        <div class="spec-block">
+            <div class="spec-block-header">Configuration ESP32</div>
+            <table class="spec-table">
+                <tr><td>WiFi SSID</td><td><span class="highlight-value">FAR</span></td></tr>
+                <tr><td>WiFi Password</td><td>FARGEER123</td></tr>
+                <tr><td>GPIO Relais</td><td><span class="highlight-value">26</span></td></tr>
+                <tr><td>Blynk Token</td><td>l5IGH1fmy7...duYI</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with info_col2:
+        st.markdown("""
+        <div class="spec-block">
+            <div class="spec-block-header">Branchement Relais</div>
+            <table class="spec-table">
+                <tr><td>VCC Relais</td><td>3.3V ou 5V ESP32</td></tr>
+                <tr><td>GND Relais</td><td>GND ESP32</td></tr>
+                <tr><td>IN Relais</td><td><span class="highlight-value">GPIO 26</span></td></tr>
+                <tr><td>Charge max</td><td>10A / 250V AC</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Code ESP32 pret a copier
+    with st.expander("Code ESP32 pret a televerser", expanded=False):
         st.code("""
 #define BLYNK_TEMPLATE_ID "TMPL2fH5U9NyY"
 #define BLYNK_TEMPLATE_NAME "Digital Twin"
@@ -1931,8 +1973,8 @@ elif menu == "Controle Relais":
 #include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
 
-char ssid[] = "VOTRE_SSID";
-char pass[] = "VOTRE_PASSWORD";
+char ssid[] = "FAR";
+char pass[] = "FARGEER123";
 
 #define RELAY_PIN 26
 #define VPIN_RELAY V0
@@ -1942,13 +1984,23 @@ BlynkTimer timer;
 BLYNK_WRITE(VPIN_RELAY) {
     int pinValue = param.asInt();
     digitalWrite(RELAY_PIN, pinValue);
+    Serial.print("Relais: ");
+    Serial.println(pinValue ? "ON" : "OFF");
 }
 
 void setup() {
     Serial.begin(115200);
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN, LOW);
+    
     WiFi.begin(ssid, pass);
+    Serial.print("Connexion WiFi FAR");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\\nWiFi FAR connecte");
+    
     Blynk.config(BLYNK_AUTH_TOKEN);
     Blynk.connect();
 }
@@ -1958,7 +2010,6 @@ void loop() {
     timer.run();
 }
         """, language="cpp")
-
 
 # ─────────────────────────────────────────────
 # RAPPORT
