@@ -17,6 +17,8 @@ import pvlib
 from pvlib.location import Location
 from pvlib import irradiance, temperature, pvsystem
 import warnings
+import requests
+from datetime import datetime
 warnings.filterwarnings('ignore')
 
 # ─────────────────────────────────────────────
@@ -562,6 +564,15 @@ STRUCTURE = {
     "panels_per_row": 6,
 }
 
+# ─────────────────────────────────────────────
+# CONFIGURATION BLYNK - ESP32 RELAY
+# ─────────────────────────────────────────────
+BLYNK_CONFIG = {
+    "auth_token": "l5IGH1fmy7E8ULoiLWjdXm9ZmaJcduYI",
+    "server": "https://blynk.cloud/external/api/",
+    "relay_pin": "V0",
+    "relay_name": "Relais Principal",
+}
 
 # ─────────────────────────────────────────────
 # FONCTIONS PRINCIPALES - ENHANCED
@@ -763,7 +774,34 @@ def get_current_meteo(lat, lon):
         return r.json().get("current", {})
     except:
         return {}
+def blynk_get_pin(pin):
+    """Lire l'etat d'un pin Blynk"""
+    url = f"{BLYNK_CONFIG['server']}get?token={BLYNK_CONFIG['auth_token']}&{pin}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return None
 
+def blynk_set_pin(pin, value):
+    """Ecrire une valeur sur un pin Blynk (0 ou 1 pour relais)"""
+    url = f"{BLYNK_CONFIG['server']}update?token={BLYNK_CONFIG['auth_token']}&{pin}={value}"
+    try:
+        response = requests.get(url, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+
+def blynk_get_device_status():
+    """Recuperer le statut du device Blynk"""
+    url = f"{BLYNK_CONFIG['server']}isHardwareConnected?token={BLYNK_CONFIG['auth_token']}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return False
 
 def calculate_degraded_power(pdc0, years_operation, degradation_rate):
     """Calculate power after degradation"""
@@ -809,6 +847,7 @@ with st.sidebar:
             "Performance Analysis",
             "Onduleurs",
             "Installation",
+            "Controle Relais",
             "Rapport",
         ],
         label_visibility="collapsed"
@@ -1685,10 +1724,324 @@ elif menu == "Performance Analysis":
         st.success("Aucune anomalie detectee dans la periode")
 
 
-# Rest of the menu options (Onduleurs, Installation, Rapport) with enhanced features...
+# ─────────────────────────────────────────────
+# ONDULEURS
+# ─────────────────────────────────────────────
+elif menu == "Onduleurs":
+    st.markdown("## Tableau de bord Onduleurs")
+
+    n = SITE["num_inverters"]
+    np.random.seed(42)
+    inv_power = np.random.normal(95, 8, n).clip(60, 105)
+    inv_status = ["ALERTE" if p < 85 else "OK" for p in inv_power]
+    inv_labels = [f"INV-{i+1:02d}" for i in range(n)]
+
+    st.markdown('<div class="section-title">Etat des onduleurs</div>', unsafe_allow_html=True)
+    inv_cols = st.columns(6)
+    for i in range(n):
+        with inv_cols[i % 6]:
+            color = "#F5A623" if inv_power[i] < 85 else "#2ECC71"
+            status_txt = inv_status[i]
+            st.markdown(f"""
+            <div style="background:#111318;border:1px solid #252A35;border-radius:8px;
+                        padding:12px 10px;text-align:center;margin-bottom:8px;border-left:3px solid {color}">
+                <div style="font-size:10px;color:#6B7585;font-family:'Space Mono',monospace;letter-spacing:0.08em">{inv_labels[i]}</div>
+                <div style="font-size:20px;font-weight:700;color:{color};font-family:'Space Mono',monospace;margin:4px 0">{inv_power[i]:.0f}%</div>
+                <div style="font-size:10px;color:{color};font-family:'Space Mono',monospace">{status_txt}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown('<div class="section-title">Puissance relative par onduleur (%)</div>', unsafe_allow_html=True)
+        fig_inv_bar = go.Figure(go.Bar(
+            x=inv_labels, y=inv_power,
+            marker_color=["#F5A623" if p < 85 else "#2ECC71" for p in inv_power],
+        ))
+        fig_inv_bar.add_hline(y=85, line_dash="dash", line_color="#E74C3C",
+                              annotation_text="Seuil alerte 85%",
+                              annotation_font_color="#E74C3C",
+                              annotation_font_size=11)
+        layout9 = dict(**PLOT_LAYOUT)
+        layout9["height"] = 300
+        layout9["margin"] = dict(t=20, b=50, l=50, r=20)
+        layout9["xaxis"] = dict(tickangle=-45, tickfont=dict(size=9), gridcolor="#1E232D")
+        layout9["yaxis"] = dict(gridcolor="#1E232D", range=[50, 110], zeroline=False)
+        fig_inv_bar.update_layout(**layout9)
+        st.plotly_chart(fig_inv_bar, use_container_width=True)
+
+    with col2:
+        st.markdown('<div class="section-title">Repartition statut onduleurs</div>', unsafe_allow_html=True)
+        ok_count = sum(1 for p in inv_power if p >= 85)
+        warn_count = n - ok_count
+        fig_pie = go.Figure(go.Pie(
+            labels=["Nominaux", "En alerte"],
+            values=[ok_count, warn_count],
+            hole=0.6,
+            marker_colors=["#2ECC71", "#F5A623"],
+        ))
+        fig_pie.add_annotation(
+            text=f"<b>{n}</b><br>Total",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="#E8EDF5", family="Space Mono"),
+        )
+        fig_pie.update_layout(
+            template="plotly_dark", paper_bgcolor="#111318",
+            height=300, margin=dict(t=20, b=20, l=20, r=20),
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
 
 # ─────────────────────────────────────────────
-# FOOTER - ENHANCED
+# PAGE INSTALLATION
+# ─────────────────────────────────────────────
+elif menu == "Installation":
+
+    st.markdown("## Caracteristiques de l'installation")
+
+    ki1, ki2, ki3, ki4 = st.columns(4)
+    ki1.metric("Puissance crete", f"{SITE['capacity_kwp']} kWp")
+    ki2.metric("Nombre de panneaux", f"{SITE['num_panels']}")
+    ki3.metric("Nombre d'onduleurs", f"{SITE['num_inverters']}")
+    ki4.metric("Surface panneau", f"{SITE['surface_m2']} m2")
+
+    st.markdown("---")
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        st.markdown("""
+        <div class="spec-block">
+            <div class="spec-block-header">Site & Generale</div>
+            <table class="spec-table">
+                <tr><td>Designation</td><td>Centrale PV Mohammedia</td></tr>
+                <tr><td>Localisation</td><td>Mohammedia, Maroc</td></tr>
+                <tr><td>Latitude</td><td><span class="highlight-value">33.7048 N</span></td></tr>
+                <tr><td>Longitude</td><td><span class="highlight-value">7.3615 W</span></td></tr>
+                <tr><td>Altitude</td><td>56 m</td></tr>
+                <tr><td>Fuseau horaire</td><td>Africa/Casablanca (UTC+1)</td></tr>
+                <tr><td>Mise en service</td><td>2024</td></tr>
+                <tr><td>Operateur</td><td>ENSET</td></tr>
+                <tr><td>Raccordement reseau</td><td>BT 220 V</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_b:
+        st.markdown(f"""
+        <div class="spec-block">
+            <div class="spec-block-header">Panneau Photovoltaique</div>
+            <table class="spec-table">
+                <tr><td>Fabricant</td><td>{PANEL['manufacturer']}</td></tr>
+                <tr><td>Modele</td><td>{PANEL['model']}</td></tr>
+                <tr><td>Technologie</td><td><span class="badge-blue">{PANEL['technology']}</span></td></tr>
+                <tr><td>Puissance nominale</td><td><span class="highlight-value">{PANEL['pdc0']} Wc</span></td></tr>
+                <tr><td>Rendement</td><td><span class="highlight-value">{PANEL['efficiency_pct']} %</span></td></tr>
+                <tr><td>Garantie</td><td>{PANEL['warranty_years']} ans</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+# CONTROLE RELAIS ESP32 VIA BLYNK
+# ─────────────────────────────────────────────
+elif menu == "Controle Relais":
+    st.markdown("## Controle Relais ESP32 via Blynk")
+    
+    device_connected = blynk_get_device_status()
+    
+    if device_connected:
+        st.success("ESP32 connecte a Blynk")
+    else:
+        st.error("ESP32 non connecte a Blynk")
+    
+    st.markdown("---")
+    
+    relay_state = blynk_get_pin(BLYNK_CONFIG["relay_pin"])
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">ETAT RELAIS</div>
+            <div class="metric-value" style="color: {'#2ECC71' if relay_state == 1 else '#E74C3C'}">
+                {'ACTIF' if relay_state == 1 else 'INACTIF'}
+            </div>
+            <div class="metric-unit">{BLYNK_CONFIG['relay_name']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">PIN VIRTUEL</div>
+            <div class="metric-value">{BLYNK_CONFIG['relay_pin']}</div>
+            <div class="metric-unit">Blynk Cloud</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">DERNIERE MAJ</div>
+            <div class="metric-value" style="font-size:18px;">{datetime.now().strftime('%H:%M:%S')}</div>
+            <div class="metric-unit">{datetime.now().strftime('%d/%m/%Y')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown('<div class="section-title">Commandes Relais</div>', unsafe_allow_html=True)
+    
+    col_btn1, col_btn2, col_btn3 = st.columns(3)
+    
+    with col_btn1:
+        if st.button("ACTIVER RELAIS", type="primary", use_container_width=True):
+            if blynk_set_pin(BLYNK_CONFIG["relay_pin"], 1):
+                st.success("Relais active avec succes")
+                st.rerun()
+            else:
+                st.error("Erreur lors de l'activation du relais")
+    
+    with col_btn2:
+        if st.button("DESACTIVER RELAIS", type="secondary", use_container_width=True):
+            if blynk_set_pin(BLYNK_CONFIG["relay_pin"], 0):
+                st.success("Relais desactive avec succes")
+                st.rerun()
+            else:
+                st.error("Erreur lors de la desactivation du relais")
+    
+    with col_btn3:
+        if st.button("ACTUALISER ETAT", use_container_width=True):
+            st.rerun()
+    
+    st.markdown("---")
+    
+    with st.expander("Code ESP32 pour Blynk", expanded=False):
+        st.code("""
+#define BLYNK_TEMPLATE_ID "TMPL2fH5U9NyY"
+#define BLYNK_TEMPLATE_NAME "Digital Twin"
+#define BLYNK_AUTH_TOKEN "l5IGH1fmy7E8ULoiLWjdXm9ZmaJcduYI"
+#define BLYNK_PRINT Serial
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "VOTRE_SSID";
+char pass[] = "VOTRE_PASSWORD";
+
+#define RELAY_PIN 26
+#define VPIN_RELAY V0
+
+BlynkTimer timer;
+
+BLYNK_WRITE(VPIN_RELAY) {
+    int pinValue = param.asInt();
+    digitalWrite(RELAY_PIN, pinValue);
+}
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, LOW);
+    WiFi.begin(ssid, pass);
+    Blynk.config(BLYNK_AUTH_TOKEN);
+    Blynk.connect();
+}
+
+void loop() {
+    Blynk.run();
+    timer.run();
+}
+        """, language="cpp")
+
+
+# ─────────────────────────────────────────────
+# RAPPORT
+# ─────────────────────────────────────────────
+elif menu == "Rapport":
+    st.markdown("## Rapport de Performance")
+
+    total_kwh = daily["production_kwh"].sum()
+    avg_pr = daily["pr"].mean()
+    best_month = monthly.loc[monthly["production_kwh"].idxmax()]
+    worst_month = monthly.loc[monthly["production_kwh"].idxmin()]
+    avg_daily = daily["production_kwh"].mean()
+
+    st.markdown(f"""
+    <div style="background:#111318;border:1px solid #252A35;border-top:2px solid #F5A623;border-radius:12px;padding:28px">
+        <div style="font-family:'Space Mono',monospace;font-size:14px;color:#F5A623;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+            Rapport de Performance
+        </div>
+        <div style="font-size:12px;color:#6B7585;margin-bottom:20px;font-family:'Space Mono',monospace">
+            {SITE['name']} &nbsp;|&nbsp; {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}
+        </div>
+        <hr style="border-color:#252A35;margin-bottom:20px">
+
+        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">
+            Production
+        </div>
+        <div class="spec-block" style="margin-bottom:20px">
+            <table class="spec-table">
+                <tr><td>Production totale</td><td><span class="highlight-value">{total_kwh/1000:.1f} MWh</span></td></tr>
+                <tr><td>Production journaliere moyenne</td><td>{avg_daily:.0f} kWh/jour</td></tr>
+                <tr><td>Meilleur mois</td><td><span style="color:#2ECC71;font-weight:600">{best_month['month_name']} — {best_month['production_kwh']/1000:.1f} MWh</span></td></tr>
+                <tr><td>Mois le plus faible</td><td><span style="color:#E74C3C;font-weight:600">{worst_month['month_name']} — {worst_month['production_kwh']/1000:.1f} MWh</span></td></tr>
+            </table>
+        </div>
+
+        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">
+            Performance
+        </div>
+        <div class="spec-block" style="margin-bottom:20px">
+            <table class="spec-table">
+                <tr><td>Performance Ratio moyen</td><td><span class="highlight-value">{avg_pr:.1f} %</span></td></tr>
+                <tr><td>Jours avec PR inferieur a 70%</td><td><span style="color:#E74C3C">{len(daily[daily['pr'] < 70])} jours</span></td></tr>
+                <tr><td>Disponibilite onduleurs</td><td><span style="color:#2ECC71">95.5 % (21/22 nominaux)</span></td></tr>
+            </table>
+        </div>
+
+        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">
+            Ressource solaire
+        </div>
+        <div class="spec-block">
+            <table class="spec-table">
+                <tr><td>GHI moyen annuel</td><td><span class="highlight-value">{results['ghi'].mean():.0f} W/m2</span></td></tr>
+                <tr><td>Temperature moyenne</td><td>{results['temp_air'].mean():.1f} C</td></tr>
+                <tr><td>Localisation</td><td>Mohammedia, Maroc — {SITE['lat']}N, {abs(SITE['lon'])}W</td></tr>
+            </table>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### Export des donnees")
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        csv_daily = daily.to_csv(index=False, float_format="%.2f")
+        st.download_button(
+            "Telecharger resultats journaliers (CSV)",
+            csv_daily,
+            file_name=f"solaris_mohammedia_daily_{start_date}_{end_date}.csv",
+            mime="text/csv",
+        )
+    with col_d2:
+        csv_monthly = monthly.to_csv(index=False, float_format="%.2f")
+        st.download_button(
+            "Telecharger resultats mensuels (CSV)",
+            csv_monthly,
+            file_name=f"solaris_mohammedia_monthly_{start_date}_{end_date}.csv",
+            mime="text/csv",
+        )
+
+
+# ─────────────────────────────────────────────
+# FOOTER
 # ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown(f"""
