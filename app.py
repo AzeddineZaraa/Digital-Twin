@@ -1769,49 +1769,128 @@ void loop() {
 elif menu == "Rapport":
     st.markdown("## Rapport de Performance")
 
-    total_kwh = daily["production_kwh"].sum()
-    avg_pr = daily["pr"].mean()
-    best_month = monthly.loc[monthly["production_kwh"].idxmax()]
+    total_kwh   = daily["production_kwh"].sum()
+    gross_kwh   = daily["gross_production_kwh"].sum()
+    avg_pr      = daily["pr"].mean()
+    best_month  = monthly.loc[monthly["production_kwh"].idxmax()]
     worst_month = monthly.loc[monthly["production_kwh"].idxmin()]
-    avg_daily = daily["production_kwh"].mean()
+    avg_daily   = daily["production_kwh"].mean()
+    low_pr_count = len(daily[daily["pr"] < 70])
+    ghi_mean    = results["ghi"].mean()
+    temp_mean   = results["temp_air"].mean()
 
+    # Precompute strings to avoid f-string / Markdown parsing conflicts
+    best_label  = f"{best_month['month_name']}  {best_month['production_kwh']/1000:.1f} MWh"
+    worst_label = f"{worst_month['month_name']}  {worst_month['production_kwh']/1000:.1f} MWh"
+    loc_label   = f"Mohammedia, Maroc  {SITE['lat']}N, {abs(SITE['lon'])}W"
+
+    # ── Styles réutilisables (inline, sans dépendance aux classes CSS globales) ──
+    S_CARD   = "background:#111318;border:1px solid #252A35;border-radius:10px;margin-bottom:20px;overflow:hidden;"
+    S_HEAD   = "background:#191D25;padding:10px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#F5A623;border-bottom:1px solid #252A35;"
+    S_TABLE  = "width:100%;border-collapse:collapse;font-size:13px;"
+    S_TD_L   = "padding:10px 14px;color:#6B7585;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;border-bottom:1px solid #252A35;"
+    S_TD_R   = "padding:10px 14px;color:#E8EDF5;font-weight:500;text-align:right;border-bottom:1px solid #252A35;"
+    S_TD_L_L = "padding:10px 14px;color:#6B7585;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;"
+    S_TD_R_L = "padding:10px 14px;color:#E8EDF5;font-weight:500;text-align:right;"
+
+    # ── En-tête du rapport ──
     st.markdown(f"""
-    <div style="background:#111318;border:1px solid #252A35;border-top:2px solid #F5A623;border-radius:12px;padding:28px">
-        <div style="font-family:'Space Mono',monospace;font-size:14px;color:#F5A623;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">
+    <div style="background:#111318;border:1px solid #252A35;border-top:2px solid #F5A623;
+                border-radius:12px;padding:24px 28px 16px 28px;margin-bottom:20px;">
+        <div style="font-family:'Space Mono',monospace;font-size:15px;color:#F5A623;
+                    font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">
             Rapport de Performance
         </div>
-        <div style="font-size:12px;color:#6B7585;margin-bottom:20px;font-family:'Space Mono',monospace">
-            {SITE['name']} &nbsp;|&nbsp; {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}
+        <div style="font-size:12px;color:#6B7585;font-family:'Space Mono',monospace;">
+            {SITE['name']} &nbsp;&#124;&nbsp; {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}
         </div>
-        <hr style="border-color:#252A35;margin-bottom:20px">
+    </div>
+    """, unsafe_allow_html=True)
 
-        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">Production</div>
-        <div class="spec-block" style="margin-bottom:20px">
-            <table class="spec-table">
-                <tr><td>Production totale</td><td><span class="highlight-value">{total_kwh/1000:.1f} MWh</span></td></tr>
-                <tr><td>Production journaliere moyenne</td><td>{avg_daily:.0f} kWh/jour</td></tr>
-                <tr><td>Meilleur mois</td><td><span style="color:#2ECC71;font-weight:600">{best_month['month_name']} — {best_month['production_kwh']/1000:.1f} MWh</span></td></tr>
-                <tr><td>Mois le plus faible</td><td><span style="color:#E74C3C;font-weight:600">{worst_month['month_name']} — {worst_month['production_kwh']/1000:.1f} MWh</span></td></tr>
-            </table>
-        </div>
+    # ── Section Production ──
+    st.markdown(
+        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'text-transform:uppercase;letter-spacing:0.08em;">Production</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(f"""
+    <div style="{S_CARD}">
+        <div style="{S_HEAD}">Production energetique</div>
+        <table style="{S_TABLE}">
+            <tr>
+                <td style="{S_TD_L}">Production totale</td>
+                <td style="{S_TD_R}"><span style="color:#F5A623;font-family:'Space Mono',monospace;font-weight:700;">{total_kwh/1000:.2f} MWh</span></td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L}">Production journaliere moyenne</td>
+                <td style="{S_TD_R}">{avg_daily:.1f} kWh / jour</td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L}">Meilleur mois</td>
+                <td style="{S_TD_R}"><span style="color:#2ECC71;font-weight:600;">{best_label}</span></td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L_L}">Mois le plus faible</td>
+                <td style="{S_TD_R_L}"><span style="color:#E74C3C;font-weight:600;">{worst_label}</span></td>
+            </tr>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
 
-        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">Performance</div>
-        <div class="spec-block" style="margin-bottom:20px">
-            <table class="spec-table">
-                <tr><td>Performance Ratio moyen</td><td><span class="highlight-value">{avg_pr:.1f} %</span></td></tr>
-                <tr><td>Jours avec PR inferieur a 70%</td><td><span style="color:#E74C3C">{len(daily[daily['pr'] < 70])} jours</span></td></tr>
-                <tr><td>Disponibilite onduleurs</td><td><span style="color:#2ECC71">95.5 % (21/22 nominaux)</span></td></tr>
-            </table>
-        </div>
+    # ── Section Performance ──
+    st.markdown(
+        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'text-transform:uppercase;letter-spacing:0.08em;">Performance</div>',
+        unsafe_allow_html=True
+    )
+    pr_color = "#2ECC71" if avg_pr >= 80 else "#F5A623" if avg_pr >= 70 else "#E74C3C"
+    st.markdown(f"""
+    <div style="{S_CARD}">
+        <div style="{S_HEAD}">Indicateurs de performance</div>
+        <table style="{S_TABLE}">
+            <tr>
+                <td style="{S_TD_L}">Performance Ratio moyen</td>
+                <td style="{S_TD_R}"><span style="color:{pr_color};font-family:'Space Mono',monospace;font-weight:700;">{avg_pr:.1f} %</span></td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L}">Jours avec PR inferieur a 70%</td>
+                <td style="{S_TD_R}"><span style="color:#E74C3C;">{low_pr_count} jours</span></td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L}">Rendement energetique net</td>
+                <td style="{S_TD_R}">{(total_kwh/gross_kwh*100) if gross_kwh>0 else 0:.1f} %</td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L_L}">Disponibilite onduleurs</td>
+                <td style="{S_TD_R_L}"><span style="color:#2ECC71;">98.5 % (estimation)</span></td>
+            </tr>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
 
-        <div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">Ressource solaire</div>
-        <div class="spec-block">
-            <table class="spec-table">
-                <tr><td>GHI moyen annuel</td><td><span class="highlight-value">{results['ghi'].mean():.0f} W/m²</span></td></tr>
-                <tr><td>Temperature moyenne</td><td>{results['temp_air'].mean():.1f} °C</td></tr>
-                <tr><td>Localisation</td><td>Mohammedia, Maroc — {SITE['lat']}N, {abs(SITE['lon'])}W</td></tr>
-            </table>
-        </div>
+    # ── Section Ressource Solaire ──
+    st.markdown(
+        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'text-transform:uppercase;letter-spacing:0.08em;">Ressource Solaire</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(f"""
+    <div style="{S_CARD}">
+        <div style="{S_HEAD}">Conditions meteorologiques</div>
+        <table style="{S_TABLE}">
+            <tr>
+                <td style="{S_TD_L}">GHI moyen sur la periode</td>
+                <td style="{S_TD_R}"><span style="color:#F5A623;font-family:'Space Mono',monospace;font-weight:700;">{ghi_mean:.0f} W/m²</span></td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L}">Temperature ambiante moyenne</td>
+                <td style="{S_TD_R}">{temp_mean:.1f} °C</td>
+            </tr>
+            <tr>
+                <td style="{S_TD_L_L}">Localisation</td>
+                <td style="{S_TD_R_L}">{loc_label}</td>
+            </tr>
+        </table>
     </div>
     """, unsafe_allow_html=True)
 
