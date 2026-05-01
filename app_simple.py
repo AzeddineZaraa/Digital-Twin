@@ -757,39 +757,74 @@ with main:
         """, unsafe_allow_html=True)
 
     with col_ems:
-        surplus = model_power_kw > real_power_kw
+    # =========================
+    # EMS LOGIC CORRIGÉE
+    # =========================
+    pv_power = model_power_kw
+    load_power = real_power_kw
 
-        if surplus:
-            ems_html = """
-            <div class="ems-status surplus">
-                <div class="ems-status-title">✅ SURPLUS PV</div>
-                <div class="ems-status-sub">Production suffisante<br>Charges peuvent être activées</div>
+    surplus_power = pv_power - load_power
+
+    if pv_power <= 0:
+        ems_state = "NIGHT"
+    elif surplus_power > 0.2:
+        ems_state = "SURPLUS"
+    else:
+        ems_state = "DEFICIT"
+
+    # =========================
+    # EMS DISPLAY
+    # =========================
+    if ems_state == "SURPLUS":
+        ems_html = """
+        <div class="ems-status surplus">
+            <div class="ems-status-title">✅ SURPLUS PV</div>
+            <div class="ems-status-sub">
+                Production suffisante<br>
+                Charges peuvent être activées
             </div>
-            """
-        else:
-            ems_html = """
-            <div class="ems-status deficit">
-                <div class="ems-status-title">⚠️ DÉFICIT PV</div>
-                <div class="ems-status-sub">Production insuffisante<br>Éviter d'activer des charges</div>
+        </div>
+        """
+    elif ems_state == "NIGHT":
+        ems_html = """
+        <div class="ems-status deficit">
+            <div class="ems-status-title">🌙 MODE NUIT</div>
+            <div class="ems-status-sub">
+                Production PV nulle<br>
+                Charges alimentées par le réseau
             </div>
-            """
+        </div>
+        """
+    else:
+        ems_html = """
+        <div class="ems-status deficit">
+            <div class="ems-status-title">⚠️ DÉFICIT PV</div>
+            <div class="ems-status-sub">
+                Production insuffisante<br>
+                Éviter d'activer des charges
+            </div>
+        </div>
+        """
 
-        r1_state = "ON" if st.session_state.relay1 else "OFF"
-        r2_state = "ON" if st.session_state.relay2 else "OFF"
-        r1_color = "on" if st.session_state.relay1 else "off"
-        r2_color = "on" if st.session_state.relay2 else "off"
+    r1_state = "ON" if st.session_state.relay1 else "OFF"
+    r2_state = "ON" if st.session_state.relay2 else "OFF"
+    r1_color = "on" if st.session_state.relay1 else "off"
+    r2_color = "on" if st.session_state.relay2 else "off"
 
-        st.markdown(f"""
-        <div class="ems-card">
-            <div class="ems-title">EMS — GESTION DES CHARGES</div>
-            {ems_html}
-            <div class="relay-item">
-                <div class="relay-header">
-                    <div class="relay-name">🔌 CHARGE 1 <span class="relay-tag">RELAIS V3</span></div>
-                </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="ems-card">
+        <div class="ems-title">EMS — GESTION DES CHARGES</div>
+        {ems_html}
+        <div style="margin-bottom:10px;font-size:12px;color:#6b7280;">
+            Surplus PV: <b>{surplus_power:.2f} kW</b>
+        </div>
+        <div class="relay-item">
+            <div class="relay-header">
+                <div class="relay-name">🔌 CHARGE 1 <span class="relay-tag">RELAIS V3</span></div>
+            </div>
+    """, unsafe_allow_html=True)
 
-        c1a, c1b = st.columns(2)
+    c1a, c1b = st.columns(2)
         with c1a:
             st.markdown('<div class="btn-on">', unsafe_allow_html=True)
             if st.button("⏻ ON", key="r1on"):
