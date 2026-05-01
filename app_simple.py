@@ -758,7 +758,7 @@ with main:
 
     with col_ems:
         # =========================
-        # EMS LOGIC CORRIGÉE
+        # EMS LOGIC
         # =========================
         pv_power = model_power_kw
         load_power = real_power_kw
@@ -771,7 +771,7 @@ with main:
             ems_state = "SURPLUS"
         else:
             ems_state = "DEFICIT"
-
+    
         # =========================
         # EMS DISPLAY
         # =========================
@@ -811,63 +811,53 @@ with main:
         r1_color = "on" if st.session_state.relay1 else "off"
         r2_color = "on" if st.session_state.relay2 else "off"
     
+        # 🔥 UN SEUL BLOC HTML
         st.markdown(f"""
         <div class="ems-card">
             <div class="ems-title">EMS — GESTION DES CHARGES</div>
+    
             {ems_html}
+    
             <div style="margin-bottom:10px;font-size:12px;color:#6b7280;">
                 Surplus PV: <b>{surplus_power:.2f} kW</b>
             </div>
+    
             <div class="relay-item">
                 <div class="relay-header">
                     <div class="relay-name">🔌 CHARGE 1 <span class="relay-tag">RELAIS V3</span></div>
                 </div>
-        """, unsafe_allow_html=True)
-    
-        c1a, c1b = st.columns(2)
-        with c1a:
-            st.markdown('<div class="btn-on">', unsafe_allow_html=True)
-            if st.button("⏻ ON", key="r1on"):
-                st.session_state.relay1 = True
-                control_relay("V3", 1)
-            st.markdown('</div>', unsafe_allow_html=True)
-        with c1b:
-            st.markdown('<div class="btn-off">', unsafe_allow_html=True)
-            if st.button("OFF", key="r1off"):
-                st.session_state.relay1 = False
-                control_relay("V3", 0)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown(f"""
-                <div class="relay-state {r1_color}">État actuel: <b>{r1_state}</b></div>
+                <div class="relay-state {r1_color}">État: <b>{r1_state}</b></div>
             </div>
+    
             <div class="relay-item">
                 <div class="relay-header">
                     <div class="relay-name">🖥️ CHARGE 2 <span class="relay-tag">RELAIS V4</span></div>
                 </div>
-        """, unsafe_allow_html=True)
-
-        c2a, c2b = st.columns(2)
-        with c2a:
-            st.markdown('<div class="btn-on">', unsafe_allow_html=True)
-            if st.button("⏻ ON", key="r2on"):
-                st.session_state.relay2 = True
-                control_relay("V4", 1)
-            st.markdown('</div>', unsafe_allow_html=True)
-        with c2b:
-            st.markdown('<div class="btn-off">', unsafe_allow_html=True)
-            if st.button("OFF", key="r2off"):
-                st.session_state.relay2 = False
-                control_relay("V4", 0)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown(f"""
-                <div class="relay-state {r2_color}">État actuel: <b>{r2_state}</b></div>
+                <div class="relay-state {r2_color}">État: <b>{r2_state}</b></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+    
+        # 🔘 boutons séparés (correct)
+        c1a, c1b = st.columns(2)
+        with c1a:
+            if st.button("⏻ ON C1"):
+                st.session_state.relay1 = True
+                control_relay("V3", 1)
+        with c1b:
+            if st.button("OFF C1"):
+                st.session_state.relay1 = False
+                control_relay("V3", 0)
+    
+        c2a, c2b = st.columns(2)
+        with c2a:
+            if st.button("⏻ ON C2"):
+                st.session_state.relay2 = True
+                control_relay("V4", 1)
+        with c2b:
+            if st.button("OFF C2"):
+                st.session_state.relay2 = False
+                control_relay("V4", 0)
 
     # ---- FOOTER ----
     st.markdown(f"""
