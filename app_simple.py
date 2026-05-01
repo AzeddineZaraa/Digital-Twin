@@ -45,20 +45,27 @@ def get_weather():
     params = {
         "latitude": config["site"]["latitude"],
         "longitude": config["site"]["longitude"],
-        "current": "temperature_2m,shortwave_radiation",
+        "current": [
+            "temperature_2m",
+            "shortwave_radiation"
+        ],
         "timezone": config["site"]["tz"]
     }
 
     try:
-        r = requests.get(url)
+        r = requests.get(url, params=params, timeout=5)
+        r.raise_for_status()
+
         data = r.json()["current"]
 
-        temp = data["temperature_2m"]
-        ghi = data["shortwave_radiation"]
+        temp = float(data.get("temperature_2m", 25))
+        ghi = float(data.get("shortwave_radiation", 0))
 
         return ghi, temp
-    except:
-        return 500, 25
+
+    except Exception as e:
+        st.warning(f"Météo indisponible → fallback ({e})")
+        return 0, 25
 
 # =========================
 # BLYNK (REAL DATA)
