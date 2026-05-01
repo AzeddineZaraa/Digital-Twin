@@ -472,7 +472,7 @@ def get_real_power():
         url = f"{config['blynk']['server']}/external/api/get?token={config['blynk']['token']}&V2"
         return float(requests.get(url, timeout=3).text)
     except:
-        return 2650.0
+        return 0
 
 def control_relay(pin, state):
     try:
