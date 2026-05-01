@@ -5,3 +5,4 @@ requests>=2.31.0
 plotly>=5.18.0
 pvlib>=0.10.3
 statsmodels>=0.14.0
+PyYAML
