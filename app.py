@@ -2,7 +2,7 @@
 SOLARIS - Digital Twin PV · Mohammedia, Maroc
 Streamlit + pvlib · Open-Meteo API
 GitHub Deployment Ready
-Enhanced Version 2.0 - CORRECTED
+Enhanced Version 2.0 - CORRECTED + THEME TOGGLE
 """
 
 import streamlit as st
@@ -29,67 +29,129 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CSS PERSONNALISE - ENHANCED
+# THEME STATE INITIALISATION (ADDED)
+# Default mode = light, toggled via session_state
 # ─────────────────────────────────────────────
-st.markdown("""
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+# ─────────────────────────────────────────────
+# THEME VARIABLES (ADDED)
+# Two palettes — dark (original) and light (new).
+# All CSS variables are resolved at render time.
+# ─────────────────────────────────────────────
+if st.session_state.dark_mode:
+    THEME = dict(
+        dark_bg       = "#08090C",
+        card_bg       = "#111318",
+        card_bg2      = "#191D25",
+        border        = "#252A35",
+        border_bright = "#353C4A",
+        text_primary  = "#E8EDF5",
+        text_secondary= "#6B7585",
+        text_muted    = "#3D4553",
+        sidebar_bg    = "#0A0C10",
+        plot_paper    = "#111318",
+        plot_plot     = "#111318",
+        plot_grid     = "#1E232D",
+        plot_font     = "#6B7585",
+        toggle_label  = "Light Mode",
+        plotly_template = "plotly_dark",
+    )
+else:
+    THEME = dict(
+        dark_bg       = "#F4F6FA",
+        card_bg       = "#FFFFFF",
+        card_bg2      = "#F0F3F8",
+        border        = "#DDE2EC",
+        border_bright = "#BEC7D8",
+        text_primary  = "#1A2035",
+        text_secondary= "#5A6580",
+        text_muted    = "#9BA5BB",
+        sidebar_bg    = "#FFFFFF",
+        plot_paper    = "#FFFFFF",
+        plot_plot     = "#FFFFFF",
+        plot_grid     = "#E8EDF5",
+        plot_font     = "#5A6580",
+        toggle_label  = "Dark Mode",
+        plotly_template = "plotly_white",
+    )
+
+# ─────────────────────────────────────────────
+# CSS PERSONNALISE - THEME-AWARE
+# Only the CSS block has changed — all variable
+# values are injected from THEME dict above.
+# ─────────────────────────────────────────────
+st.markdown(f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
-    :root {
-        --solar-yellow: #F5A623;
-        --solar-orange: #E8860A;
-        --solar-amber: #FFCF6B;
-        --dark-bg: #08090C;
-        --card-bg: #111318;
-        --card-bg2: #191D25;
-        --border: #252A35;
-        --border-bright: #353C4A;
-        --text-primary: #E8EDF5;
-        --text-secondary: #6B7585;
-        --text-muted: #3D4553;
-        --green: #2ECC71;
-        --red: #E74C3C;
-        --blue: #3498DB;
+    :root {{
+        --solar-yellow:  #F5A623;
+        --solar-orange:  #E8860A;
+        --solar-amber:   #FFCF6B;
+        --dark-bg:       {THEME['dark_bg']};
+        --card-bg:       {THEME['card_bg']};
+        --card-bg2:      {THEME['card_bg2']};
+        --border:        {THEME['border']};
+        --border-bright: {THEME['border_bright']};
+        --text-primary:  {THEME['text_primary']};
+        --text-secondary:{THEME['text_secondary']};
+        --text-muted:    {THEME['text_muted']};
+        --green:  #2ECC71;
+        --red:    #E74C3C;
+        --blue:   #3498DB;
         --purple: #9B59B6;
-        --teal: #1ABC9C;
+        --teal:   #1ABC9C;
         --gradient-gold: linear-gradient(135deg, #F5A623, #E8860A);
-        --gradient-dark: linear-gradient(135deg, #0E1117, #141820);
-    }
+        --gradient-dark: linear-gradient(135deg, {THEME['card_bg']}, {THEME['card_bg2']});
+        --sidebar-bg:    {THEME['sidebar_bg']};
+    }}
 
-    html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+    html, body, [class*="css"] {{
+        font-family: 'DM Sans', sans-serif;
+    }}
 
-    .stApp {
+    .stApp {{
         background-color: var(--dark-bg);
         background-image:
             radial-gradient(ellipse at 20% 0%, rgba(245,166,35,0.04) 0%, transparent 60%),
             radial-gradient(ellipse at 80% 100%, rgba(52,152,219,0.03) 0%, transparent 60%);
-    }
+    }}
 
-    [data-testid="stSidebar"] {
-        background-color: #0A0C10 !important;
+    [data-testid="stSidebar"] {{
+        background-color: var(--sidebar-bg) !important;
         border-right: 1px solid var(--border) !important;
-    }
+    }}
 
-    [data-testid="stSidebar"] .stRadio label {
+    [data-testid="stSidebar"] .stRadio label {{
         font-family: 'DM Sans', sans-serif !important;
         color: var(--text-secondary) !important;
         font-size: 13px !important;
         transition: color 0.3s ease;
-    }
+    }}
 
-    [data-testid="stSidebar"] .stRadio label:hover { color: var(--solar-yellow) !important; }
+    [data-testid="stSidebar"] .stRadio label:hover {{ color: var(--solar-yellow) !important; }}
 
-    .main-header {
+    /* ── THEME TOGGLE BUTTON (ADDED) ── */
+    .theme-toggle-bar {{
+        display: flex;
+        justify-content: flex-end;
+        padding: 6px 0 0 0;
+        margin-bottom: -6px;
+    }}
+
+    .main-header {{
         background: var(--gradient-dark);
         border: 1px solid var(--border);
         border-top: 2px solid var(--solar-yellow);
         border-radius: 0 0 12px 12px;
         padding: 22px 32px;
         margin-bottom: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }}
 
-    .plant-name {
+    .plant-name {{
         font-family: 'Space Mono', monospace;
         font-size: 20px;
         font-weight: 700;
@@ -99,17 +161,17 @@ st.markdown("""
         background-clip: text;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-    }
+    }}
 
-    .plant-sub {
+    .plant-sub {{
         font-size: 12px;
         color: var(--text-secondary);
         margin-top: 5px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-    }
+    }}
 
-    .status-badge {
+    .status-badge {{
         display: inline-flex;
         align-items: center;
         gap: 7px;
@@ -121,23 +183,23 @@ st.markdown("""
         color: var(--green);
         font-family: 'Space Mono', monospace;
         letter-spacing: 0.05em;
-    }
+    }}
 
-    .status-dot {
+    .status-dot {{
         width: 7px;
         height: 7px;
         border-radius: 50%;
         background: var(--green);
         box-shadow: 0 0 8px var(--green);
         animation: pulse 2s infinite;
-    }
+    }}
 
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
-    }
+    @keyframes pulse {{
+        0%, 100% {{ opacity: 1; }}
+        50%       {{ opacity: 0.4; }}
+    }}
 
-    .metric-card {
+    .metric-card {{
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 10px;
@@ -145,49 +207,49 @@ st.markdown("""
         position: relative;
         overflow: hidden;
         transition: all 0.3s ease;
-    }
+    }}
 
-    .metric-card:hover {
+    .metric-card:hover {{
         border-color: var(--solar-yellow);
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(245,166,35,0.1);
-    }
+    }}
 
-    .metric-card::before {
+    .metric-card::before {{
         content: '';
         position: absolute;
         top: 0; left: 0; right: 0;
         height: 2px;
         background: linear-gradient(90deg, var(--solar-yellow), var(--solar-orange));
         opacity: 0.6;
-    }
+    }}
 
-    .metric-label {
+    .metric-label {{
         font-size: 10px;
         color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.12em;
         font-family: 'Space Mono', monospace;
         margin-bottom: 8px;
-    }
+    }}
 
-    .metric-value {
+    .metric-value {{
         font-family: 'Space Mono', monospace;
         font-size: 26px;
         font-weight: 700;
         color: var(--solar-yellow);
         line-height: 1.1;
-    }
+    }}
 
-    .metric-unit {
+    .metric-unit {{
         font-size: 13px;
         color: var(--text-secondary);
         font-family: 'DM Sans', sans-serif;
         font-weight: 400;
         margin-top: 4px;
-    }
+    }}
 
-    .section-title {
+    .section-title {{
         font-family: 'Space Mono', monospace;
         font-size: 11px;
         font-weight: 700;
@@ -197,9 +259,9 @@ st.markdown("""
         margin-bottom: 14px;
         padding-bottom: 10px;
         border-bottom: 1px solid var(--border);
-    }
+    }}
 
-    .alert-card {
+    .alert-card {{
         border-radius: 8px;
         padding: 11px 16px;
         margin-bottom: 8px;
@@ -207,50 +269,50 @@ st.markdown("""
         border-left: 3px solid;
         font-family: 'DM Sans', sans-serif;
         transition: transform 0.2s ease;
-    }
+    }}
 
-    .alert-card:hover { transform: translateX(4px); }
+    .alert-card:hover {{ transform: translateX(4px); }}
 
-    .alert-warning { background: rgba(245,166,35,0.06); border-color: var(--solar-yellow); color: #D4993A; }
-    .alert-error   { background: rgba(231,76,60,0.06);  border-color: var(--red);          color: #D45C4E; }
-    .alert-ok      { background: rgba(46,204,113,0.06); border-color: var(--green);        color: #3DBD6A; }
-    .alert-info    { background: rgba(52,152,219,0.06); border-color: var(--blue);         color: #5BA4D9; }
+    .alert-warning {{ background: rgba(245,166,35,0.06); border-color: var(--solar-yellow); color: #D4993A; }}
+    .alert-error   {{ background: rgba(231,76,60,0.06);  border-color: var(--red);          color: #D45C4E; }}
+    .alert-ok      {{ background: rgba(46,204,113,0.06); border-color: var(--green);        color: #3DBD6A; }}
+    .alert-info    {{ background: rgba(52,152,219,0.06); border-color: var(--blue);         color: #5BA4D9; }}
 
-    .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .spec-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
 
-    .spec-table tr {
+    .spec-table tr {{
         border-bottom: 1px solid var(--border);
         transition: background 0.2s ease;
-    }
+    }}
 
-    .spec-table tr:hover { background: rgba(245,166,35,0.05); }
-    .spec-table tr:last-child { border-bottom: none; }
+    .spec-table tr:hover {{ background: rgba(245,166,35,0.04); }}
+    .spec-table tr:last-child {{ border-bottom: none; }}
 
-    .spec-table td { padding: 10px 14px; vertical-align: middle; }
+    .spec-table td {{ padding: 10px 14px; vertical-align: middle; }}
 
-    .spec-table td:first-child {
+    .spec-table td:first-child {{
         color: var(--text-secondary);
         font-family: 'Space Mono', monospace;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         width: 48%;
-    }
+    }}
 
-    .spec-table td:last-child { color: var(--text-primary); font-weight: 500; text-align: right; }
+    .spec-table td:last-child {{ color: var(--text-primary); font-weight: 500; text-align: right; }}
 
-    .spec-block {
+    .spec-block {{
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 10px;
         padding: 4px 0;
         margin-bottom: 16px;
         transition: all 0.3s ease;
-    }
+    }}
 
-    .spec-block:hover { border-color: var(--border-bright); }
+    .spec-block:hover {{ border-color: var(--border-bright); }}
 
-    .spec-block-header {
+    .spec-block-header {{
         background: var(--card-bg2);
         border-radius: 8px 8px 0 0;
         padding: 10px 16px;
@@ -261,30 +323,30 @@ st.markdown("""
         letter-spacing: 0.12em;
         color: var(--solar-yellow);
         border-bottom: 1px solid var(--border);
-    }
+    }}
 
-    .highlight-value { color: var(--solar-yellow); font-family: 'Space Mono', monospace; font-weight: 700; }
+    .highlight-value {{ color: var(--solar-yellow); font-family: 'Space Mono', monospace; font-weight: 700; }}
 
-    .badge-green  { background: rgba(46,204,113,0.1);  color: var(--green);  border: 1px solid rgba(46,204,113,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }
-    .badge-orange { background: rgba(245,166,35,0.1);  color: var(--solar-yellow); border: 1px solid rgba(245,166,35,0.2); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }
-    .badge-blue   { background: rgba(52,152,219,0.1);  color: var(--blue);   border: 1px solid rgba(52,152,219,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }
-    .badge-purple { background: rgba(155,89,182,0.1);  color: var(--purple); border: 1px solid rgba(155,89,182,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }
+    .badge-green  {{ background: rgba(46,204,113,0.1);  color: var(--green);  border: 1px solid rgba(46,204,113,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }}
+    .badge-orange {{ background: rgba(245,166,35,0.1);  color: var(--solar-yellow); border: 1px solid rgba(245,166,35,0.2); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }}
+    .badge-blue   {{ background: rgba(52,152,219,0.1);  color: var(--blue);   border: 1px solid rgba(52,152,219,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }}
+    .badge-purple {{ background: rgba(155,89,182,0.1);  color: var(--purple); border: 1px solid rgba(155,89,182,0.2);  border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: 'Space Mono', monospace; }}
 
-    .kpi-card {
+    .kpi-card {{
         background: var(--gradient-dark);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 20px 16px;
         text-align: center;
         transition: all 0.3s ease;
-    }
+    }}
 
-    .kpi-card:hover {
+    .kpi-card:hover {{
         border-color: var(--solar-yellow);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    }
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }}
 
-    .kpi-value {
+    .kpi-value {{
         font-family: 'Space Mono', monospace;
         font-size: 32px;
         font-weight: 700;
@@ -292,41 +354,41 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-    }
+    }}
 
-    .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 8px; }
+    .kpi-label {{ font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 8px; }}
 
-    div[data-testid="metric-container"] {
+    div[data-testid="metric-container"] {{
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 10px;
         padding: 16px 18px;
         transition: all 0.3s ease;
-    }
+    }}
 
-    div[data-testid="metric-container"]:hover {
+    div[data-testid="metric-container"]:hover {{
         border-color: var(--solar-yellow);
         transform: translateY(-2px);
-    }
+    }}
 
-    div[data-testid="metric-container"] label {
+    div[data-testid="metric-container"] label {{
         color: var(--text-secondary) !important;
         font-size: 11px !important;
         text-transform: uppercase;
         letter-spacing: 0.1em;
         font-family: 'Space Mono', monospace !important;
-    }
+    }}
 
-    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {{
         color: var(--solar-yellow) !important;
         font-size: 24px !important;
         font-weight: 700 !important;
         font-family: 'Space Mono', monospace !important;
-    }
+    }}
 
-    .stPlotlyChart { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .stPlotlyChart {{ border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }}
 
-    .sidebar-brand {
+    .sidebar-brand {{
         font-family: 'Space Mono', monospace;
         font-size: 18px;
         font-weight: 700;
@@ -336,17 +398,17 @@ st.markdown("""
         background-clip: text;
         letter-spacing: 0.1em;
         margin-bottom: 4px;
-    }
+    }}
 
-    .sidebar-sub {
+    .sidebar-sub {{
         font-size: 11px;
         color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         margin-bottom: 16px;
-    }
+    }}
 
-    .data-info {
+    .data-info {{
         background: rgba(52,152,219,0.08);
         border: 1px solid rgba(52,152,219,0.2);
         border-radius: 6px;
@@ -354,50 +416,80 @@ st.markdown("""
         font-size: 11px;
         color: var(--blue);
         font-family: 'Space Mono', monospace;
-    }
+    }}
 
-    .stDownloadButton button {
+    .stDownloadButton button {{
         background: var(--gradient-gold) !important;
         color: white !important;
         border: none !important;
         font-family: 'Space Mono', monospace !important;
         font-weight: 700 !important;
         transition: all 0.3s ease !important;
-    }
+    }}
 
-    .stDownloadButton button:hover {
+    .stDownloadButton button:hover {{
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(245,166,35,0.3);
-    }
+    }}
 
-    hr { border-color: var(--border) !important; }
+    hr {{ border-color: var(--border) !important; }}
 
-    .stTabs [data-baseweb="tab-list"] {
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
         background-color: var(--card-bg);
         border-radius: 8px;
         padding: 6px;
-    }
+    }}
 
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] {{
         color: var(--text-secondary);
         font-family: 'Space Mono', monospace;
         font-size: 12px;
         border-radius: 6px;
-    }
+    }}
 
-    .stTabs [aria-selected="true"] {
+    .stTabs [aria-selected="true"] {{
         background-color: rgba(245,166,35,0.1);
         color: var(--solar-yellow);
-    }
+    }}
 
-    .glass-card {
+    .glass-card {{
         background: rgba(17, 19, 24, 0.8);
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255,255,255,0.1);
         border-radius: 12px;
         padding: 20px;
-    }
+    }}
+
+    /* ── IMPROVED SPACING (ADDED) ── */
+    .block-container {{
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+    }}
+
+    section[data-testid="stSidebar"] > div {{
+        padding-top: 1.5rem;
+        padding-left: 1.2rem;
+        padding-right: 1.2rem;
+    }}
+
+    /* ── THEME TOGGLE BUTTON STYLE (ADDED) ── */
+    button[data-testid="baseButton-secondary"].theme-btn {{
+        background: var(--card-bg) !important;
+        color: var(--text-secondary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 6px !important;
+        font-family: 'Space Mono', monospace !important;
+        font-size: 11px !important;
+        padding: 4px 14px !important;
+        letter-spacing: 0.08em !important;
+        transition: all 0.25s ease !important;
+    }}
+
+    button[data-testid="baseButton-secondary"].theme-btn:hover {{
+        border-color: var(--solar-yellow) !important;
+        color: var(--solar-yellow) !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -504,7 +596,6 @@ def fetch_meteo(lat, lon, start_date, end_date):
         return None
 
 
-# FIX 1 : suppression du double décorateur @st.cache_data(ttl=3600) dupliqué
 @st.cache_data(ttl=3600)
 def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamma_pdc, start_date, end_date):
     """Enhanced pvlib simulation with comprehensive energy modeling"""
@@ -578,7 +669,6 @@ def run_pvlib_simulation(lat, lon, altitude, timezone, tilt, azimuth, pdc0, gamm
 
     results["ac_power_kw"] = results["ac_power_w"] / 1000
     results["net_ac_power_kw"] = results["net_ac_power_w"] / 1000
-    # FIX 2 : utiliser .dt sur la colonne datetime (pas l'index qui a déjà été réinitialisé)
     results["date"] = results["datetime"].dt.date
     results["hour"] = results["datetime"].dt.hour
     results["month"] = results["datetime"].dt.month
@@ -704,14 +794,18 @@ def calculate_financial_metrics(energy_kwh, electricity_price=0.12):
     return energy_kwh * electricity_price
 
 
+# ─────────────────────────────────────────────
+# PLOT LAYOUT — theme-aware (MODIFIED)
+# Paper/plot bg and font color pulled from THEME
+# ─────────────────────────────────────────────
 PLOT_LAYOUT = dict(
-    template="plotly_dark",
-    paper_bgcolor="#111318",
-    plot_bgcolor="#111318",
-    font=dict(family="DM Sans", color="#6B7585"),
+    template=THEME["plotly_template"],
+    paper_bgcolor=THEME["plot_paper"],
+    plot_bgcolor=THEME["plot_plot"],
+    font=dict(family="DM Sans", color=THEME["plot_font"]),
     margin=dict(t=20, b=30, l=50, r=20),
-    xaxis=dict(gridcolor="#1E232D", zeroline=False),
-    yaxis=dict(gridcolor="#1E232D", zeroline=False),
+    xaxis=dict(gridcolor=THEME["plot_grid"], zeroline=False),
+    yaxis=dict(gridcolor=THEME["plot_grid"], zeroline=False),
     hovermode="x unified",
 )
 
@@ -742,8 +836,6 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Periode d'analyse**")
 
-    # FIX 3 : séparation propre des deux date_input pour éviter
-    # l'écrasement de end_date par session_state dans le mauvais bloc
     col_s, col_e = st.columns(2)
     with col_s:
         start_date = st.date_input(
@@ -759,9 +851,6 @@ with st.sidebar:
             label_visibility="collapsed"
         )
 
-    # Quick date presets
-    # FIX 4 : les presets utilisent st.session_state pour propager
-    # les nouvelles dates sans écraser les widgets déjà rendus
     preset_cols = st.columns(3)
     with preset_cols[0]:
         if st.button("7j", key="7d"):
@@ -779,7 +868,6 @@ with st.sidebar:
             st.session_state["_preset_end"] = datetime.now().date()
             st.rerun()
 
-    # Apply preset overrides if set
     if "_preset_start" in st.session_state:
         start_date = st.session_state.pop("_preset_start")
     if "_preset_end" in st.session_state:
@@ -808,6 +896,18 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Degradation estimee**")
     st.markdown(f"Apres {years_operational} ans : **{degraded_power:.0f} W** (-{(1 - degraded_power / PANEL['pdc0']) * 100:.1f}%)")
+
+    # ── THEME TOGGLE in sidebar (ADDED) ──
+    # Placed at bottom of sidebar for easy access without disrupting layout.
+    st.markdown("---")
+    st.markdown("**Apparence**")
+    if st.button(
+        f"{'Light Mode' if st.session_state.dark_mode else 'Dark Mode'}",
+        key="theme_toggle",
+        use_container_width=True,
+    ):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
 
 
 # ─────────────────────────────────────────────
@@ -861,10 +961,10 @@ st.markdown(f"""
         </div>
         <div style="display:flex;align-items:center;gap:16px">
             <div style="text-align:right;">
-                <div style="font-size:12px;color:#6B7585;font-family:'Space Mono',monospace">
+                <div style="font-size:12px;color:{THEME['text_secondary']};font-family:'Space Mono',monospace">
                     {now.strftime('%d/%m/%Y %H:%M')}
                 </div>
-                <div style="font-size:10px;color:#3D4553;font-family:'Space Mono',monospace">
+                <div style="font-size:10px;color:{THEME['text_muted']};font-family:'Space Mono',monospace">
                     UTC+1 &nbsp;|&nbsp; GHI: {ghi_now:.0f} W/m2 &nbsp;|&nbsp; Cloud: {cloud_cover_now}%
                 </div>
             </div>
@@ -908,12 +1008,9 @@ if menu == "Vue Globale":
 
     st.markdown("---")
 
-    # FIX 5 : col_img et col_perf correctement délimités —
-    # les graphiques du bas sont maintenant HORS du with col_perf
     col_img, col_perf = st.columns([5, 1])
 
     with col_img:
-        # Image optionnelle — ne plante pas si assets/ absent
         import os
         if os.path.exists("assets/Scene_enset.png"):
             st.image("assets/Scene_enset.png", use_container_width=True)
@@ -935,7 +1032,6 @@ if menu == "Vue Globale":
         current_hour = now.hour
         today_date = now.date()
 
-        # FIX 6 : comparaison date.date() avec date.date() (types cohérents)
         mask = (results["date"] == today_date) & (results["hour"] == current_hour)
         current_power = results.loc[mask, "net_ac_power_kw"].values
         current_power_val = current_power[0] if len(current_power) > 0 else 0.0
@@ -956,7 +1052,6 @@ if menu == "Vue Globale":
             f"{(total_kwh / gross_kwh) * 100:.1f}%" if gross_kwh > 0 else "0%"
         )
 
-    # ── Graphiques hors des colonnes col_img / col_perf ──
     st.markdown("---")
 
     col_left, col_right = st.columns([2, 1])
@@ -994,7 +1089,7 @@ if menu == "Vue Globale":
         layout = dict(**PLOT_LAYOUT)
         layout["height"] = 320
         layout["showlegend"] = True
-        layout["yaxis"] = dict(gridcolor="#1E232D", title="kWh", zeroline=False)
+        layout["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="kWh", zeroline=False)
         fig_daily.update_layout(**layout)
         st.plotly_chart(fig_daily, use_container_width=True)
 
@@ -1015,7 +1110,7 @@ if menu == "Vue Globale":
             marker_color="#9B59B6",
             text=daily_weekday["production_kwh"].round(0).astype(str) + " kWh",
             textposition="outside",
-            textfont=dict(color="#E8EDF5", size=9, family="Space Mono"),
+            textfont=dict(color=THEME["text_primary"], size=9, family="Space Mono"),
         ))
         layout2 = dict(**PLOT_LAYOUT)
         layout2["height"] = 320
@@ -1108,7 +1203,7 @@ elif menu == "Production":
 
             layout3 = dict(**PLOT_LAYOUT)
             layout3["height"] = 350
-            layout3["yaxis"] = dict(gridcolor="#1E232D", range=[0, 110], zeroline=False)
+            layout3["yaxis"] = dict(gridcolor=THEME["plot_grid"], range=[0, 110], zeroline=False)
             fig_pr.update_layout(**layout3)
             st.plotly_chart(fig_pr, use_container_width=True)
 
@@ -1125,7 +1220,7 @@ elif menu == "Production":
 
             layout_cf = dict(**PLOT_LAYOUT)
             layout_cf["height"] = 350
-            layout_cf["yaxis"] = dict(gridcolor="#1E232D", title="%", zeroline=False)
+            layout_cf["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="%", zeroline=False)
             fig_cf.update_layout(**layout_cf)
             st.plotly_chart(fig_cf, use_container_width=True)
 
@@ -1188,8 +1283,8 @@ elif menu == "Production":
 
         layout4 = dict(**PLOT_LAYOUT)
         layout4["height"] = 350
-        layout4["xaxis"] = dict(title="Heure", gridcolor="#1E232D", dtick=1, zeroline=False)
-        layout4["yaxis"] = dict(title="Puissance (kW)", gridcolor="#1E232D", zeroline=False)
+        layout4["xaxis"] = dict(title="Heure", gridcolor=THEME["plot_grid"], dtick=1, zeroline=False)
+        layout4["yaxis"] = dict(title="Puissance (kW)", gridcolor=THEME["plot_grid"], zeroline=False)
         fig_hour.update_layout(**layout4)
         st.plotly_chart(fig_hour, use_container_width=True)
 
@@ -1214,8 +1309,8 @@ elif menu == "Production":
 
         layout_compare = dict(**PLOT_LAYOUT)
         layout_compare["height"] = 300
-        layout_compare["xaxis"] = dict(title="Heure", gridcolor="#1E232D", dtick=1)
-        layout_compare["yaxis"] = dict(title="kW", gridcolor="#1E232D")
+        layout_compare["xaxis"] = dict(title="Heure", gridcolor=THEME["plot_grid"], dtick=1)
+        layout_compare["yaxis"] = dict(title="kW", gridcolor=THEME["plot_grid"])
         fig_compare.update_layout(**layout_compare)
         st.plotly_chart(fig_compare, use_container_width=True)
 
@@ -1236,14 +1331,14 @@ elif menu == "Production":
                 [0.6, "#A05A00"], [0.8, "#E8860A"], [1, "#F5A623"]
             ],
             showscale=True,
-            colorbar=dict(title="kW", tickfont=dict(color="#6B7585")),
+            colorbar=dict(title="kW", tickfont=dict(color=THEME["plot_font"])),
             hovertemplate="Heure: %{x}<br>Mois: %{y}<br>Puissance: %{z:.1f} kW<extra></extra>"
         ))
 
         layout5 = dict(**PLOT_LAYOUT)
         layout5["height"] = 400
-        layout5["xaxis"] = dict(title="Heure", tickfont=dict(size=10), gridcolor="#1E232D")
-        layout5["yaxis"] = dict(tickfont=dict(size=10), gridcolor="#1E232D")
+        layout5["xaxis"] = dict(title="Heure", tickfont=dict(size=10), gridcolor=THEME["plot_grid"])
+        layout5["yaxis"] = dict(tickfont=dict(size=10), gridcolor=THEME["plot_grid"])
         fig_heat.update_layout(**layout5)
         st.plotly_chart(fig_heat, use_container_width=True)
 
@@ -1292,7 +1387,7 @@ elif menu == "Meteo & Irradiance":
 
             layout6 = dict(**PLOT_LAYOUT)
             layout6["height"] = 350
-            layout6["yaxis"] = dict(gridcolor="#1E232D", title="kWh/m²", zeroline=False)
+            layout6["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="kWh/m²", zeroline=False)
             fig_ghi.update_layout(**layout6)
             st.plotly_chart(fig_ghi, use_container_width=True)
 
@@ -1311,7 +1406,7 @@ elif menu == "Meteo & Irradiance":
 
             layout_poa = dict(**PLOT_LAYOUT)
             layout_poa["height"] = 350
-            layout_poa["yaxis"] = dict(gridcolor="#1E232D", title="W/m²", zeroline=False)
+            layout_poa["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="W/m²", zeroline=False)
             fig_poa.update_layout(**layout_poa)
             st.plotly_chart(fig_poa, use_container_width=True)
 
@@ -1330,7 +1425,7 @@ elif menu == "Meteo & Irradiance":
 
         layout_kt = dict(**PLOT_LAYOUT)
         layout_kt["height"] = 250
-        layout_kt["yaxis"] = dict(gridcolor="#1E232D", title="KT", range=[0, 1])
+        layout_kt["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="KT", range=[0, 1])
         fig_kt.update_layout(**layout_kt)
         st.plotly_chart(fig_kt, use_container_width=True)
 
@@ -1354,7 +1449,7 @@ elif menu == "Meteo & Irradiance":
 
             layout_temp = dict(**PLOT_LAYOUT)
             layout_temp["height"] = 350
-            layout_temp["yaxis"] = dict(gridcolor="#1E232D", title="°C", zeroline=False)
+            layout_temp["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="°C", zeroline=False)
             fig_temp.update_layout(**layout_temp)
             st.plotly_chart(fig_temp, use_container_width=True)
 
@@ -1369,8 +1464,8 @@ elif menu == "Meteo & Irradiance":
 
             layout_cell = dict(**PLOT_LAYOUT)
             layout_cell["height"] = 350
-            layout_cell["xaxis"] = dict(title="Heure", gridcolor="#1E232D", dtick=1)
-            layout_cell["yaxis"] = dict(title="°C", gridcolor="#1E232D")
+            layout_cell["xaxis"] = dict(title="Heure", gridcolor=THEME["plot_grid"], dtick=1)
+            layout_cell["yaxis"] = dict(title="°C", gridcolor=THEME["plot_grid"])
             fig_cell.update_layout(**layout_cell)
             st.plotly_chart(fig_cell, use_container_width=True)
 
@@ -1394,7 +1489,7 @@ elif menu == "Meteo & Irradiance":
         layout_solar = dict(**PLOT_LAYOUT)
         layout_solar["height"] = 300
         layout_solar["barmode"] = "group"
-        layout_solar["yaxis"] = dict(gridcolor="#1E232D", title="kWh/m²")
+        layout_solar["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="kWh/m²")
         fig_solar.update_layout(**layout_solar)
         st.plotly_chart(fig_solar, use_container_width=True)
 
@@ -1426,8 +1521,8 @@ elif menu == "Performance Analysis":
 
         layout_dist = dict(**PLOT_LAYOUT)
         layout_dist["height"] = 300
-        layout_dist["xaxis"] = dict(title="PR (%)", gridcolor="#1E232D")
-        layout_dist["yaxis"] = dict(title="Frequence", gridcolor="#1E232D")
+        layout_dist["xaxis"] = dict(title="PR (%)", gridcolor=THEME["plot_grid"])
+        layout_dist["yaxis"] = dict(title="Frequence", gridcolor=THEME["plot_grid"])
         fig_dist.update_layout(**layout_dist)
         st.plotly_chart(fig_dist, use_container_width=True)
 
@@ -1449,7 +1544,7 @@ elif menu == "Performance Analysis":
 
         layout_pr_month = dict(**PLOT_LAYOUT)
         layout_pr_month["height"] = 300
-        layout_pr_month["yaxis"] = dict(gridcolor="#1E232D", title="PR %", range=[50, 100])
+        layout_pr_month["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="PR %", range=[50, 100])
         fig_pr_month.update_layout(**layout_pr_month)
         st.plotly_chart(fig_pr_month, use_container_width=True)
 
@@ -1466,7 +1561,7 @@ elif menu == "Performance Analysis":
         ))
         layout_ey = dict(**PLOT_LAYOUT)
         layout_ey["height"] = 300
-        layout_ey["yaxis"] = dict(gridcolor="#1E232D", title="kWh/kWp")
+        layout_ey["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="kWh/kWp")
         fig_ey.update_layout(**layout_ey)
         st.plotly_chart(fig_ey, use_container_width=True)
 
@@ -1481,7 +1576,7 @@ elif menu == "Performance Analysis":
         ))
         layout_cum = dict(**PLOT_LAYOUT)
         layout_cum["height"] = 300
-        layout_cum["yaxis"] = dict(gridcolor="#1E232D", title="MWh")
+        layout_cum["yaxis"] = dict(gridcolor=THEME["plot_grid"], title="MWh")
         fig_cum.update_layout(**layout_cum)
         st.plotly_chart(fig_cum, use_container_width=True)
 
@@ -1523,9 +1618,9 @@ elif menu == "Onduleurs":
         with inv_cols[i % min(n, 6)]:
             color = "#F5A623" if inv_power[i] < 85 else "#2ECC71"
             st.markdown(f"""
-            <div style="background:#111318;border:1px solid #252A35;border-radius:8px;
+            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};border-radius:8px;
                         padding:12px 10px;text-align:center;margin-bottom:8px;border-left:3px solid {color}">
-                <div style="font-size:10px;color:#6B7585;font-family:'Space Mono',monospace">{inv_labels[i]}</div>
+                <div style="font-size:10px;color:{THEME['text_secondary']};font-family:'Space Mono',monospace">{inv_labels[i]}</div>
                 <div style="font-size:20px;font-weight:700;color:{color};font-family:'Space Mono',monospace;margin:4px 0">{inv_power[i]:.0f}%</div>
                 <div style="font-size:10px;color:{color};font-family:'Space Mono',monospace">{inv_status[i]}</div>
             </div>
@@ -1545,8 +1640,8 @@ elif menu == "Onduleurs":
                               annotation_font_color="#E74C3C", annotation_font_size=11)
         layout9 = dict(**PLOT_LAYOUT)
         layout9["height"] = 300
-        layout9["xaxis"] = dict(tickangle=-45, tickfont=dict(size=9), gridcolor="#1E232D")
-        layout9["yaxis"] = dict(gridcolor="#1E232D", range=[50, 110], zeroline=False)
+        layout9["xaxis"] = dict(tickangle=-45, tickfont=dict(size=9), gridcolor=THEME["plot_grid"])
+        layout9["yaxis"] = dict(gridcolor=THEME["plot_grid"], range=[50, 110], zeroline=False)
         fig_inv_bar.update_layout(**layout9)
         st.plotly_chart(fig_inv_bar, use_container_width=True)
 
@@ -1560,9 +1655,13 @@ elif menu == "Onduleurs":
         ))
         fig_pie.add_annotation(
             text=f"<b>{n}</b><br>Total", x=0.5, y=0.5, showarrow=False,
-            font=dict(size=14, color="#E8EDF5", family="Space Mono"),
+            font=dict(size=14, color=THEME["text_primary"], family="Space Mono"),
         )
-        fig_pie.update_layout(template="plotly_dark", paper_bgcolor="#111318", height=300, margin=dict(t=20, b=20, l=20, r=20))
+        fig_pie.update_layout(
+            template=THEME["plotly_template"],
+            paper_bgcolor=THEME["plot_paper"],
+            height=300, margin=dict(t=20, b=20, l=20, r=20)
+        )
         st.plotly_chart(fig_pie, use_container_width=True)
 
 
@@ -1779,37 +1878,34 @@ elif menu == "Rapport":
     ghi_mean    = results["ghi"].mean()
     temp_mean   = results["temp_air"].mean()
 
-    # Precompute strings to avoid f-string / Markdown parsing conflicts
     best_label  = f"{best_month['month_name']}  {best_month['production_kwh']/1000:.1f} MWh"
     worst_label = f"{worst_month['month_name']}  {worst_month['production_kwh']/1000:.1f} MWh"
     loc_label   = f"Mohammedia, Maroc  {SITE['lat']}N, {abs(SITE['lon'])}W"
 
-    # ── Styles réutilisables (inline, sans dépendance aux classes CSS globales) ──
-    S_CARD   = "background:#111318;border:1px solid #252A35;border-radius:10px;margin-bottom:20px;overflow:hidden;"
-    S_HEAD   = "background:#191D25;padding:10px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#F5A623;border-bottom:1px solid #252A35;"
+    # ── Inline style vars — theme-aware (MODIFIED: replaced hardcoded hex with THEME values) ──
+    S_CARD   = f"background:{THEME['card_bg']};border:1px solid {THEME['border']};border-radius:10px;margin-bottom:20px;overflow:hidden;"
+    S_HEAD   = f"background:{THEME['card_bg2']};padding:10px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#F5A623;border-bottom:1px solid {THEME['border']};"
     S_TABLE  = "width:100%;border-collapse:collapse;font-size:13px;"
-    S_TD_L   = "padding:10px 14px;color:#6B7585;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;border-bottom:1px solid #252A35;"
-    S_TD_R   = "padding:10px 14px;color:#E8EDF5;font-weight:500;text-align:right;border-bottom:1px solid #252A35;"
-    S_TD_L_L = "padding:10px 14px;color:#6B7585;font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;"
-    S_TD_R_L = "padding:10px 14px;color:#E8EDF5;font-weight:500;text-align:right;"
+    S_TD_L   = f"padding:10px 14px;color:{THEME['text_secondary']};font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;border-bottom:1px solid {THEME['border']};"
+    S_TD_R   = f"padding:10px 14px;color:{THEME['text_primary']};font-weight:500;text-align:right;border-bottom:1px solid {THEME['border']};"
+    S_TD_L_L = f"padding:10px 14px;color:{THEME['text_secondary']};font-family:'Space Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;width:50%;"
+    S_TD_R_L = f"padding:10px 14px;color:{THEME['text_primary']};font-weight:500;text-align:right;"
 
-    # ── En-tête du rapport ──
     st.markdown(f"""
-    <div style="background:#111318;border:1px solid #252A35;border-top:2px solid #F5A623;
+    <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};border-top:2px solid #F5A623;
                 border-radius:12px;padding:24px 28px 16px 28px;margin-bottom:20px;">
         <div style="font-family:'Space Mono',monospace;font-size:15px;color:#F5A623;
                     font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">
             Rapport de Performance
         </div>
-        <div style="font-size:12px;color:#6B7585;font-family:'Space Mono',monospace;">
+        <div style="font-size:12px;color:{THEME['text_secondary']};font-family:'Space Mono',monospace;">
             {SITE['name']} &nbsp;&#124;&nbsp; {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Section Production ──
     st.markdown(
-        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'<div style="font-size:13px;font-weight:600;color:{THEME["text_primary"]};margin-bottom:8px;'
         f'text-transform:uppercase;letter-spacing:0.08em;">Production</div>',
         unsafe_allow_html=True
     )
@@ -1837,9 +1933,8 @@ elif menu == "Rapport":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Section Performance ──
     st.markdown(
-        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'<div style="font-size:13px;font-weight:600;color:{THEME["text_primary"]};margin-bottom:8px;'
         f'text-transform:uppercase;letter-spacing:0.08em;">Performance</div>',
         unsafe_allow_html=True
     )
@@ -1868,9 +1963,8 @@ elif menu == "Rapport":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Section Ressource Solaire ──
     st.markdown(
-        f'<div style="font-size:13px;font-weight:600;color:#E8EDF5;margin-bottom:8px;'
+        f'<div style="font-size:13px;font-weight:600;color:{THEME["text_primary"]};margin-bottom:8px;'
         f'text-transform:uppercase;letter-spacing:0.08em;">Ressource Solaire</div>',
         unsafe_allow_html=True
     )
@@ -1921,7 +2015,7 @@ elif menu == "Rapport":
 # ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown(f"""
-<div style="text-align:center;color:#252A35;font-size:11px;padding:10px 0;font-family:'Space Mono',monospace;letter-spacing:0.08em">
+<div style="text-align:center;color:{THEME['text_muted']};font-size:11px;padding:10px 0;font-family:'Space Mono',monospace;letter-spacing:0.08em">
     SOLARIS DIGITAL TWIN V2.0 &nbsp;|&nbsp; MOHAMMEDIA, MAROC &nbsp;|&nbsp; pvlib + Open-Meteo API
     &nbsp;|&nbsp; {now.strftime('%d/%m/%Y %H:%M')}
 </div>
