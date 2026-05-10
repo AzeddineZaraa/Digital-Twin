@@ -1027,7 +1027,11 @@ if menu == "Vue Globale":
 
     # PZEM MONITORING
     st.markdown("## Monitoring Temps Reel PZEM")
+if pzem_voltage <= 0:
 
+    st.error("Moniteur PZEM non connecté")
+
+else:
     pzem_cols = st.columns(6)
 
     with pzem_cols[0]:
