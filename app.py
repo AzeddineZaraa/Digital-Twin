@@ -1027,31 +1027,31 @@ if menu == "Vue Globale":
 
     # PZEM MONITORING
     st.markdown("## Monitoring Temps Reel PZEM")
-if pzem_voltage <= 0:
-
-    st.error("Moniteur PZEM non connecté")
-
-else:
-    pzem_cols = st.columns(6)
-
-    with pzem_cols[0]:
-        st.metric("Voltage", f"{pzem_voltage:.1f} V")
-
-    with pzem_cols[1]:
-        st.metric("Current", f"{pzem_current:.2f} A")
-
-    with pzem_cols[2]:
-        st.metric("Power", f"{pzem_power:.1f} W")
-
-    with pzem_cols[3]:
-        st.metric("Energy", f"{pzem_energy:.3f} kWh")
-
-    with pzem_cols[4]:
-        st.metric("Frequency", f"{pzem_frequency:.1f} Hz")
-
-    with pzem_cols[5]:
-        st.metric("PF", f"{pzem_pf:.2f}")
-        
+    if pzem_voltage <= 0:
+    
+        st.error("Moniteur PZEM non connecté")
+    
+    else:
+        pzem_cols = st.columns(6)
+    
+        with pzem_cols[0]:
+            st.metric("Voltage", f"{pzem_voltage:.1f} V")
+    
+        with pzem_cols[1]:
+            st.metric("Current", f"{pzem_current:.2f} A")
+    
+        with pzem_cols[2]:
+            st.metric("Power", f"{pzem_power:.1f} W")
+    
+        with pzem_cols[3]:
+            st.metric("Energy", f"{pzem_energy:.3f} kWh")
+    
+        with pzem_cols[4]:
+            st.metric("Frequency", f"{pzem_frequency:.1f} Hz")
+    
+        with pzem_cols[5]:
+            st.metric("PF", f"{pzem_pf:.2f}")
+            
     st.markdown("## Performance Globale")
 
     kpi_cols = st.columns(5)
