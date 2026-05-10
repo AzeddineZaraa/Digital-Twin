@@ -1014,6 +1014,7 @@ st.markdown(f"""
 # VUE GLOBALE
 # ─────────────────────────────────────────────
 if menu == "Vue Globale":
+
     total_kwh = daily["production_kwh"].sum()
     gross_kwh = daily["gross_production_kwh"].sum()
     losses_kwh = gross_kwh - total_kwh
@@ -1023,7 +1024,9 @@ if menu == "Vue Globale":
     avg_cf = daily["capacity_factor"].mean()
     co2_avoided = estimate_co2_avoidance(total_kwh)
     financial_savings = calculate_financial_metrics(total_kwh)
-        st.markdown("## Monitoring Temps Reel PZEM")
+
+    # PZEM MONITORING
+    st.markdown("## Monitoring Temps Reel PZEM")
 
     pzem_cols = st.columns(6)
 
