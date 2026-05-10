@@ -555,10 +555,19 @@ STRUCTURE = {
 BLYNK_CONFIG = {
     "auth_token": "l5IGH1fmy7E8ULoiLWjdXm9ZmaJcduYI",
     "server": "https://blynk.cloud/external/api/",
+
+    # Relais
     "relay_pin": "V0",
     "relay_name": "Relais Principal",
-}
 
+    # PZEM
+    "voltage_pin": "V2",
+    "current_pin": "V3",
+    "power_pin": "V4",
+    "energy_pin": "V5",
+    "frequency_pin": "V6",
+    "pf_pin": "V7",
+}
 # ─────────────────────────────────────────────
 # FONCTIONS PRINCIPALES
 # ─────────────────────────────────────────────
@@ -780,7 +789,21 @@ def blynk_get_device_status():
             return response.json()
     except:
         return False
+def blynk_get_value(pin):
+    """Lire une valeur numerique depuis Blynk"""
 
+    url = f"{BLYNK_CONFIG['server']}get?token={BLYNK_CONFIG['auth_token']}&{pin}"
+
+    try:
+        response = requests.get(url, timeout=5)
+
+        if response.status_code == 200:
+            return float(response.text)
+
+    except:
+        return 0.0
+
+    return 0.0
 
 def calculate_degraded_power(pdc0, years_operation, degradation_rate):
     return pdc0 * (1 - degradation_rate) ** years_operation
@@ -930,7 +953,16 @@ monthly = compute_monthly(daily)
 current_meteo = get_current_meteo(SITE["lat"], SITE["lon"])
 now = datetime.now()
 
+# ─────────────────────────────────────────────
+# PZEM REAL TIME VALUES
+# ─────────────────────────────────────────────
 
+pzem_voltage = blynk_get_value(BLYNK_CONFIG["voltage_pin"])
+pzem_current = blynk_get_value(BLYNK_CONFIG["current_pin"])
+pzem_power = blynk_get_value(BLYNK_CONFIG["power_pin"])
+pzem_energy = blynk_get_value(BLYNK_CONFIG["energy_pin"])
+pzem_frequency = blynk_get_value(BLYNK_CONFIG["frequency_pin"])
+pzem_pf = blynk_get_value(BLYNK_CONFIG["pf_pin"])
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
@@ -991,7 +1023,28 @@ if menu == "Vue Globale":
     avg_cf = daily["capacity_factor"].mean()
     co2_avoided = estimate_co2_avoidance(total_kwh)
     financial_savings = calculate_financial_metrics(total_kwh)
+        st.markdown("## Monitoring Temps Reel PZEM")
 
+    pzem_cols = st.columns(6)
+
+    with pzem_cols[0]:
+        st.metric("Voltage", f"{pzem_voltage:.1f} V")
+
+    with pzem_cols[1]:
+        st.metric("Current", f"{pzem_current:.2f} A")
+
+    with pzem_cols[2]:
+        st.metric("Power", f"{pzem_power:.1f} W")
+
+    with pzem_cols[3]:
+        st.metric("Energy", f"{pzem_energy:.3f} kWh")
+
+    with pzem_cols[4]:
+        st.metric("Frequency", f"{pzem_frequency:.1f} Hz")
+
+    with pzem_cols[5]:
+        st.metric("PF", f"{pzem_pf:.2f}")
+        
     st.markdown("## Performance Globale")
 
     kpi_cols = st.columns(5)
